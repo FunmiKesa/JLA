@@ -1,2 +1,4 @@
 .idea
 .fairmot
+*.pyc
+__pycache__
