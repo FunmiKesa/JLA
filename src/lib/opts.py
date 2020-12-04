@@ -99,16 +99,16 @@ class opts(object):
                              help='keep the original resolution'
                                   ' during validation.')
     # tracking
-    self.parser.add_argument('--test_mot16', default=False, help='test mot16')
-    self.parser.add_argument('--val_mot15', default=False, help='val mot15')
-    self.parser.add_argument('--test_mot15', default=False, help='test mot15')
-    self.parser.add_argument('--val_mot16', default=False, help='val mot16 or mot15')
-    self.parser.add_argument('--test_mot17', default=False, help='test mot17')
-    self.parser.add_argument('--val_mot17', default=False, help='val mot17')
-    self.parser.add_argument('--val_mot20', default=False, help='val mot20')
-    self.parser.add_argument('--test_mot20', default=False, help='test mot20')
-    self.parser.add_argument('--val_hie', default=False, help='val hie')
-    self.parser.add_argument('--test_hie', default=False, help='test hie')
+    self.parser.add_argument('--test_mot16', default=False, action='store_true', help='test mot16')
+    self.parser.add_argument('--val_mot15', default=False, action='store_true', help='val mot15')
+    self.parser.add_argument('--test_mot15', default=False, action='store_true', help='test mot15')
+    self.parser.add_argument('--val_mot16', default=False, action='store_true', help='val mot16 or mot15')
+    self.parser.add_argument('--test_mot17', default=False, action='store_true', help='test mot17')
+    self.parser.add_argument('--val_mot17', default=False, action='store_true', help='val mot17')
+    self.parser.add_argument('--val_mot20', default=False, action='store_true', help='val mot20')
+    self.parser.add_argument('--test_mot20', default=False, action='store_true', help='test mot20')
+    self.parser.add_argument('--val_hie', default=False, action='store_true', help='val hie')
+    self.parser.add_argument('--test_hie', default=False, action='store_true', help='test hie')
     self.parser.add_argument('--conf_thres', type=float, default=0.4, help='confidence thresh for tracking')
     self.parser.add_argument('--det_thres', type=float, default=0.3, help='confidence thresh for detection')
     self.parser.add_argument('--nms_thres', type=float, default=0.4, help='iou thresh for nms')
@@ -124,7 +124,7 @@ class opts(object):
     self.parser.add_argument('--data_cfg', type=str,
                              default='../src/lib/cfg/data.json',
                              help='load data from cfg')
-    self.parser.add_argument('--data_dir', type=str, default='/data/yfzhang/MOT/JDE')
+    self.parser.add_argument('--data_dir', type=str, default='/media2/funmi/MOT')
 
     # loss
     self.parser.add_argument('--mse_loss', action='store_true',
