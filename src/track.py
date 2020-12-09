@@ -120,12 +120,13 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
     result_root = os.path.join(data_root, '..', 'results', exp_name)
     mkdir_if_missing(result_root)
     data_type = 'mot'
-
+    metrics = mm.metrics.motchallenge_metrics
+    mh = mm.metrics.create()
     # run tracking
     accs = []
     n_frame = 0
     timer_avgs, timer_calls = [], []
-    for seq in seqs:
+    for i, seq in enumerate(seqs):
         output_dir = os.path.join(data_root, '..', 'outputs', exp_name, seq) if save_images or save_videos else None
         logger.info('start seq: {}'.format(seq))
         dataloader = datasets.LoadImages(osp.join(data_root, seq, 'img1'), opt.img_size)
@@ -142,6 +143,13 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
         logger.info('Evaluate seq: {}'.format(seq))
         evaluator = Evaluator(data_root, seq, data_type)
         accs.append(evaluator.eval_file(result_filename))
+        summary = Evaluator.get_summary(accs, seqs[:i+1], metrics)
+        strsummary = mm.io.render_summary(
+        summary,
+        formatters=mh.formatters,
+        namemap=mm.io.motchallenge_metric_names
+    )
+        print(strsummary)
         if save_videos:
             output_video_path = osp.join(output_dir, '{}.mp4'.format(seq))
             cmd_str = 'ffmpeg -f image2 -i {}/%05d.jpg -c:v copy {}'.format(output_dir, output_video_path)
@@ -153,8 +161,7 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
     logger.info('Time elapsed: {:.2f} seconds, FPS: {:.2f}'.format(all_time, 1.0 / avg_time))
 
     # get summary
-    metrics = mm.metrics.motchallenge_metrics
-    mh = mm.metrics.create()
+    
     summary = Evaluator.get_summary(accs, seqs, metrics)
     strsummary = mm.io.render_summary(
         summary,
@@ -272,7 +279,7 @@ if __name__ == '__main__':
     main(opt,
          data_root=data_root,
          seqs=seqs,
-         exp_name='MOT17_test_public_dla34',
+         exp_name=opt.exp_id,
          show_image=False,
          save_images=False,
          save_videos=False)

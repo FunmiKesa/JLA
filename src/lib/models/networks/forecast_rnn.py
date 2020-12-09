@@ -46,13 +46,13 @@ class DecoderRNN(nn.Module):
         self.relu_dla_features = nn.ReLU()
         self.device = device
         self.context_encoder = nn.Linear(self.num_hidden, int(self.num_hidden / 2))
-        self.dla_encoder = nn.Linear(2048, int(self.num_hidden / 2))
+        self.dla_encoder = nn.Linear(256, int(self.num_hidden / 2))
         if num_layers > 1:
             self.decoder2 = nn.GRUCell(self.num_hidden, self.num_hidden)
         if num_layers > 2:
             self.decoder3 = nn.GRUCell(self.num_hidden, self.num_hidden)
 
-    def forward(self, context, dla_features, forecast_length=5, input_size=8, sequence_length=10, val=False):
+    def forward(self, context, dla_features, forecast_length=5,  sequence_length=10, val=False):
         outputs = []
         # h_t = torch.zeros(context.size(0), self.num_hidden, dtype=torch.float).to(self.device)
         h_t = context

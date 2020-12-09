@@ -20,11 +20,11 @@ from .basetrack import BaseTrack, TrackState
 from utils.post_process import ctdet_post_process
 from utils.image import get_affine_transform
 from models.utils import _tranpose_and_gather_feat
-
+from models.networks.forecast_rnn import EncoderRNN, DecoderRNN
 
 class STrack(BaseTrack):
     shared_kalman = KalmanFilter()
-    def __init__(self, tlwh, score, temp_feat, buffer_size=30):
+    def __init__(self, tlwh, score, temp_feat, buffer_size=30, forecasts=None):
 
         # wait activate
         self._tlwh = np.asarray(tlwh, dtype=np.float)
@@ -39,6 +39,7 @@ class STrack(BaseTrack):
         self.update_features(temp_feat)
         self.features = deque([], maxlen=buffer_size)
         self.alpha = 0.9
+        self._forecasts = forecasts
 
     def update_features(self, feat):
         feat /= np.linalg.norm(feat)
@@ -119,6 +120,23 @@ class STrack(BaseTrack):
 
     @property
     # @jit(nopython=True)
+    def forecasts(self):
+        """Get forecasts using dcx, dcy, dw, dy"""
+        
+        det = self.xywh
+        f = self._forecasts.copy().reshape(-1, 4)
+        f = np.cumsum(f, axis=1)
+
+        f = det[np.newaxis, :] + f
+
+
+        f[:, :2] -= f[:, 2:] / 2
+        f[:, 2:] += f[:, :2]
+
+        return f
+
+    @property
+    # @jit(nopython=True)
     def tlwh(self):
         """Get current position in bounding box format `(top left x, top left y,
                 width, height)`.
@@ -138,6 +156,15 @@ class STrack(BaseTrack):
         """
         ret = self.tlwh.copy()
         ret[2:] += ret[:2]
+        return ret
+    
+    @property
+    # @jit(nopython=True)
+    def xywh(self):
+        """Convert bounding box to format `(center x, center y, width, height)`
+        """
+        ret = self.tlwh.copy()
+        ret[:2] += ret[2:] / 2
         return ret
 
     @staticmethod
@@ -199,6 +226,17 @@ class JDETracker(object):
 
         self.kalman_filter = KalmanFilter()
 
+        self.forecast = opt.forecast
+        if self.forecast:
+            self.sequence_length = self.forecast['sequence_length']
+            self.forecast_length = self.forecast['forecast_length']
+            self.hidden_size = self.forecast['hidden_size']
+            self.input_size = self.forecast['input_size']
+            self.output_size = self.forecast['output_size']
+            self.encoder = EncoderRNN(self.opt.device, self.input_size, self.hidden_size, 1).to(self.opt.device)
+            self.decoder = DecoderRNN(self.opt.device, self.input_size, self.output_size, self.hidden_size, 0, 1).to(self.opt.device)
+
+
     def post_process(self, dets, meta):
         dets = dets.detach().cpu().numpy()
         dets = dets.reshape(1, -1, dets.shape[2])
@@ -255,6 +293,13 @@ class JDETracker(object):
             id_feature = _tranpose_and_gather_feat(id_feature, inds)
             id_feature = id_feature.squeeze(0)
             id_feature = id_feature.cpu().numpy()
+            forecast = None
+            if self.opt.forecast:
+                forecast = output['fc']
+                batch_size, s , height, width = forecast.shape
+                forecast = _tranpose_and_gather_feat(forecast, inds).view(forecast.size(0), -1, forecast.size(1)).squeeze(0)
+                forecast = forecast.cpu().numpy()
+
 
         dets = self.post_process(dets, meta)
         dets = self.merge_outputs([dets])[1]
@@ -262,23 +307,41 @@ class JDETracker(object):
         remain_inds = dets[:, 4] > self.opt.conf_thres
         dets = dets[remain_inds]
         id_feature = id_feature[remain_inds]
+        if self.opt.forecast:
+            forecast = forecast[remain_inds]
+            if len(forecast) > 0:
+                context = torch.from_numpy(dets).float().to(self.opt.device)
+                forecast = torch.from_numpy(forecast).float().to(self.opt.device)
+                context = self.encoder(context.unsqueeze(0))
+                forecast = self.decoder(context, forecast.unsqueeze(0), val=True)
 
-        # vis
+         # vis
         '''
+        os.environ['DISPLAY'] = 'localhost:13.0'
+        img = img0.copy()
         for i in range(0, dets.shape[0]):
             bbox = dets[i][0:4]
-            cv2.rectangle(img0, (bbox[0], bbox[1]),
+            cv2.rectangle(img, (bbox[0], bbox[1]),
                           (bbox[2], bbox[3]),
                           (0, 255, 0), 2)
-        cv2.imshow('dets', img0)
-        cv2.waitKey(0)
-        id0 = id0-1
-        '''
+            for j in range(10, forecast.shape[1] // 4):
+                bbox_pred = forecast[i][j*4: j*4+4]
+                cv2.rectangle(img, (bbox_pred[0], bbox_pred[1]),
+                          (bbox_pred[2], bbox_pred[3]),
+                          (255, 255, j+100), 2)
+                cv2.imshow('dets', img)
+                cv2.waitKey(1)
+        # id0 = id0-1
+        # '''
 
         if len(dets) > 0:
             '''Detections'''
-            detections = [STrack(STrack.tlbr_to_tlwh(tlbrs[:4]), tlbrs[4], f, 30) for
-                          (tlbrs, f) in zip(dets[:, :5], id_feature)]
+            if self.opt.forecast:
+                detections = [STrack(STrack.tlbr_to_tlwh(tlbrs[:4]), tlbrs[4], f, 30, ft) for
+                          (tlbrs, f, ft) in zip(dets[:, :5], id_feature, forecast)]
+            else:
+                detections = [STrack(STrack.tlbr_to_tlwh(tlbrs[:4]), tlbrs[4], f, 30) for
+                            (tlbrs, f) in zip(dets[:, :5], id_feature)]
         else:
             detections = []
 
