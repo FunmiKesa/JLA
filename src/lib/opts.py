@@ -47,7 +47,7 @@ class opts(object):
                              help='visualization threshold.')
     
     # model
-    self.parser.add_argument('--arch', default='dla_34', 
+    self.parser.add_argument('--arch', default='rnnforecast_34', 
                              help='model architecture. Currently tested'
                                   'resdcn_34 | resdcn_50 | resfpndcn_34 |'
                                   'dla_34 | hrnet_18')

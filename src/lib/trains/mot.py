@@ -16,7 +16,6 @@ from models.utils import _sigmoid, _tranpose_and_gather_feat
 from utils.post_process import ctdet_post_process
 from .base_trainer import BaseTrainer
 
-
 class MotLoss(torch.nn.Module):
     def __init__(self, opt):
         super(MotLoss, self).__init__()
@@ -132,8 +131,8 @@ class MotLoss(torch.nn.Module):
 
                 # fc_loss += self.FCLoss(decoded_input * forecast_mask, target * forecast_mask) / opt.num_stacks
 
-                fc_loss += torch.abs(decoded_input - target).sum() /(forecast_mask.sum() + 1e-4)
-                # fc_loss += F.l1_loss(decoded_input, target, size_average=False) /(forecast_mask.sum() + 1e-4)
+                # fc_loss += torch.abs(decoded_input - target).sum() /(forecast_mask.sum() + 1e-4)
+                fc_loss += F.l1_loss(decoded_input, target, size_average=False) /(forecast_mask.sum() + 1e-4)
                 # fc_loss += torch.abs(decoded_input - target).sum() /(sequence_length * input_size * forecast_mask.sum())
 
         #loss = opt.hm_weight * hm_loss + opt.wh_weight * wh_loss + opt.off_weight * off_loss + opt.id_weight * id_loss
@@ -156,16 +155,29 @@ class MotLoss(torch.nn.Module):
         return loss, loss_stats
 
 
+class MotLossFlex(MotLoss):
+    def __init__(self, opt, model):
+        super(MotLossFlex, self).__init__(opt)
+        if model:
+            self.classifier = model.reid
+            if self.opt.forecast:
+                self.encoder = model.encoder 
+                self.decoder = model.decoder
+
 class MotTrainer(BaseTrainer):
     def __init__(self, opt, model, optimizer=None):
         super(MotTrainer, self).__init__(opt, model, optimizer=optimizer)
+        self.model = model
+        if self.opt.forecast:
+            self.loss_stats += ['fc_loss']
+            self.model_with_loss.loss =  MotLossFlex(self.opt, self.model)
+
 
     def _get_losses(self, opt):
-        loss_states = ['loss', 'hm_loss', 'wh_loss', 'off_loss', 'id_loss']
-        if opt.forecast:
-            loss_states += ['fc_loss']
+        loss_stats = ['loss', 'hm_loss', 'wh_loss', 'off_loss', 'id_loss']
+        
         loss = MotLoss(opt)
-        return loss_states, loss
+        return loss_stats, loss
 
     def save_result(self, output, batch, results):
         reg = output['reg'] if self.opt.reg_offset else None

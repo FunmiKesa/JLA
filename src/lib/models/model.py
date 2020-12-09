@@ -13,6 +13,7 @@ from .networks.resnet_dcn import get_pose_net as get_pose_net_dcn
 from .networks.resnet_fpn_dcn import get_pose_net as get_pose_net_fpn_dcn
 from .networks.pose_hrnet import get_pose_net as get_pose_net_hrnet
 from .networks.pose_dla_conv import get_pose_net as get_dla_conv
+from .networks.rnn_forecast import get_pose_net as get_rnn_forecast
 
 _model_factory = {
   'dlav0': get_dlav0, # default DLAup
@@ -20,10 +21,19 @@ _model_factory = {
   'dlaconv': get_dla_conv,
   'resdcn': get_pose_net_dcn,
   'resfpndcn': get_pose_net_fpn_dcn,
-  'hrnet': get_pose_net_hrnet
+  'hrnet': get_pose_net_hrnet,
+  'rnnforecast': get_rnn_forecast
 }
 
-def create_model(arch, heads, head_conv):
+def create_model_forecast(arch, heads, head_conv, opt=None):
+  num_layers = int(arch[arch.find('_') + 1:]) if '_' in arch else 0
+  arch = arch[:arch.find('_')] if '_' in arch else arch
+  get_model = _model_factory[arch]
+  model = get_model(num_layers=num_layers, heads=heads, head_conv=head_conv, nID=opt.nID, forecast=opt.forecast, device=opt.device)
+  # model = RNN(opt,model)
+  return model
+
+def create_model(arch, heads, head_conv, forecast=None):
   num_layers = int(arch[arch.find('_') + 1:]) if '_' in arch else 0
   arch = arch[:arch.find('_')] if '_' in arch else arch
   get_model = _model_factory[arch]
@@ -40,6 +50,7 @@ def load_model(model, model_path, optimizer=None, resume=False,
   
   # convert data_parallal to model
   for k in state_dict_:
+
     if k.startswith('module') and not k.startswith('module_list'):
       state_dict[k[7:]] = state_dict_[k]
     else:

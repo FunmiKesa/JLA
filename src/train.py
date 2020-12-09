@@ -11,7 +11,7 @@ import torch
 import torch.utils.data
 from torchvision.transforms import transforms as T
 from opts import opts
-from models.model import create_model, load_model, save_model
+from models.model import create_model, load_model, save_model, create_model_forecast
 from models.data_parallel import DataParallel
 from logger import Logger
 from datasets.dataset_factory import get_dataset
@@ -40,7 +40,7 @@ def main(opt):
     opt.device = torch.device('cuda' if opt.gpus[0] >= 0 else 'cpu')
 
     print('Creating model...')
-    model = create_model(opt.arch, opt.heads, opt.head_conv)
+    model = create_model_forecast(opt.arch, opt.heads, opt.head_conv, opt) if opt.forecast else create_model(opt.arch, opt.heads, opt.head_conv)
     optimizer = torch.optim.Adam(model.parameters(), opt.lr)
     start_epoch = 0
 
