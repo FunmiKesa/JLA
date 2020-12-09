@@ -382,6 +382,15 @@ class JointDataset(LoadImagesAndLabels):  # for training
         self.augment = augment
         self.transforms = transforms
 
+        self.forecast = opt.forecast
+        if self.forecast:
+            self.sequence_length = self.forecast['sequence_length']
+            self.forecast_length = self.forecast['forecast_length']
+            self.hidden_size = self.forecast['hidden_size']
+            self.input_size = self.forecast['input_size']
+            self.memory = {}
+            self.memory_limit = opt.batch_size *  self.sequence_length
+
         print('=' * 80)
         print('dataset summary')
         print(self.tid_num)
@@ -389,6 +398,20 @@ class JointDataset(LoadImagesAndLabels):  # for training
         print('start index')
         print(self.tid_start_index)
         print('=' * 80)
+
+    def store_in_memory(self, k, v):
+        # print(len(self.memory))
+        if len(self.memory) > self.memory_limit:
+            keys = list(self.memory)
+            while len(self.memory) > self.memory_limit:
+                self.memory.pop(keys.pop(0))
+
+        self.memory[k] = v
+
+    def get_from_memory(self, k):
+        if k in self.memory:
+            return self.memory[k]
+        return None
 
     def __getitem__(self, files_index):
 
@@ -400,6 +423,122 @@ class JointDataset(LoadImagesAndLabels):  # for training
         img_path = self.img_files[ds][files_index - start_index]
         label_path = self.label_files[ds][files_index - start_index]
 
+        ret = self.get_item(img_path, label_path, ds)
+
+        if self.forecast:
+            if label_path not in self.memory:
+                self.store_in_memory(label_path, ret)
+
+            # get the previous [sequence_length] frames if it exist else augment data
+            label_path_split = label_path.split('/')
+            img_ext = img_path.split('.')[-1]
+            frame_id = int(label_path_split[-1].replace(".txt", ""))
+            num_prev_frames = self.sequence_length
+            # prev_bboxes = np.zeros(
+                # (num_prev_frames, *ret['bbox'].shape), dtype=np.float32)
+            # prev_inputs = np.zeros(
+                # (num_prev_frames, *ret['input'].shape), dtype=np.float32)
+            # frameId is included
+            bb_hist = np.zeros(
+                (num_prev_frames, self.max_objs,  self.input_size), dtype=np.float32)
+            forcast_mask = np.zeros((num_prev_frames,) , dtype=np.float32)
+            last_exist = (img_path, label_path)
+
+            last_label_path = label_path
+            for i in range(num_prev_frames):
+                prev_id = frame_id - (i + 1)
+                label_path_join = '/'.join(label_path_split[:-1])
+                prev_label_path = f"{label_path_join}/{prev_id:06d}.txt"
+                if os.path.exists(prev_label_path):
+                    # check memory for bboxes
+                    prev_img_path = prev_label_path.replace(
+                        "labels_with_ids", "images").replace("txt", img_ext)
+                    if prev_label_path not in self.memory:
+
+                        self.store_in_memory(prev_label_path, self.get_item(
+                            prev_img_path, prev_label_path, ds))
+                    last_exist = (prev_img_path, prev_label_path)
+                else:
+                    # augment data
+                    continue
+                    self.store_in_memory(
+                        prev_label_path, self.get_item(*last_exist, ds))
+
+                # calulate constant velocity
+                if True:  # dummy, used to collapse code
+                    curr_meta = self.get_from_memory(prev_label_path)
+                    prev_meta = self.get_from_memory(last_label_path)
+
+                    if curr_meta == None or prev_meta == None:
+                        print(prev_label_path, "\n", last_label_path, "\n")
+                        continue
+                    curr_meta = copy.deepcopy(curr_meta)
+                    prev_meta = copy.deepcopy(prev_meta)
+
+                    bbox_curr = curr_meta['bbox']
+                    bbox_prev = prev_meta['bbox']
+
+                    ids_curr = curr_meta['ids']
+                    ids_prev = prev_meta['ids']
+
+                    num_of_objs_curr = ids_curr.argmax() + 1
+                    num_of_objs_prev = ids_prev.argmax() + 1
+
+                    ids_curr = ids_curr[:num_of_objs_curr]
+                    ids_prev = ids_prev[:num_of_objs_prev]
+
+                    common_ids, mask_curr, mask_prev = np.intersect1d(
+                        ids_curr, ids_prev, assume_unique=True, return_indices=True)
+
+                    bbox_curr = bbox_curr[mask_curr]
+                    bbox_prev = bbox_prev[mask_prev]
+
+                    v = np.zeros(
+                        (num_of_objs_curr, 8), dtype=np.float32)
+
+                    bbox_prev[:, 2:] -= bbox_prev[:, :2]
+                    bbox_prev[:, :2] += bbox_prev[:, 2:] / 2
+
+                    bbox_curr[:, 2:] -= bbox_curr[:, :2]
+                    bbox_curr[:, :2] += bbox_curr[:, 2:] / 2
+
+                    use_aspect_ratio = False
+                    if use_aspect_ratio:
+                        bbox_prev[:, 2] /= bbox_prev[:, 3]
+                        bbox_curr[:, 2] /= bbox_curr[:, 3]
+
+
+                    v[mask_curr, :4] = bbox_curr
+                    v[mask_curr, 4:] = bbox_curr - bbox_prev
+
+                    if self.input_size == 9:
+                        v = np.pad(v, [(0,0),(1,0)], mode='constant', constant_values=0)
+                        v[mask_curr, 0] = ids_curr[mask_curr] / self.nID
+
+                    bb_hist[i, :num_of_objs_curr] = v
+                    forcast_mask[i] = 1
+
+                # if i == 0:
+                    # if "hidden_state" in curr_meta:
+
+                    #     ret['hidden_state'] = curr_meta['hidden_state']
+                    # else:
+                    #     ret['hidden_state'] = np.concatenate((np.random.rand(self.max_objs, self.hidden_size), np.random.rand(
+                    #         self.max_objs, self.hidden_size)), axis=0).astype(np.float32)
+
+                # prev_bboxes[i] = copy.deepcopy(self.memory[prev_label_path]['bbox'])
+                # prev_inputs[i] = copy.deepcopy(self.memory[prev_label_path]['input'])
+
+                last_label_path = prev_label_path
+
+            # ret['prev_inputs'] = prev_inputs
+            # ret['prev_bboxes'] = prev_bboxes
+            ret['bb_hist'] = bb_hist
+            ret['forecast_mask'] = forcast_mask
+
+        return ret
+
+    def get_item(self, img_path, label_path, ds):
         imgs, labels, img_path, (input_h, input_w) = self.get_data(img_path, label_path)
         for i, _ in enumerate(labels):
             if labels[i, 1] > -1:

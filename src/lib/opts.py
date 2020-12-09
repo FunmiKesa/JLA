@@ -157,6 +157,11 @@ class opts(object):
                              help='category specific bounding box size.')
     self.parser.add_argument('--not_reg_offset', action='store_true',
                              help='not regress local offset.')
+    self.parser.add_argument('--forecast', action='store_true',
+                             help='not forecast bounding location')                     
+    self.parser.add_argument('--sequence_length', type=int, default=10, help='Number of previous frames to use in forecasting')
+    self.parser.add_argument('--forecast_length', type=int, default=5, help='Number of future frames forecast')
+    self.parser.add_argument('--hidden_size', type=int, default=512, help='Size of the RNN hidden layer')
 
   def parse(self, args=''):
     if args == '':
@@ -172,6 +177,15 @@ class opts(object):
     opt.fix_res = not opt.keep_res
     print('Fix size testing.' if opt.fix_res else 'Keep resolution testing.')
     opt.reg_offset = not opt.not_reg_offset
+
+    if opt.forecast:
+      opt.forecast = {
+        'forecast_length': opt.forecast_length,
+        'sequence_length': opt.sequence_length,
+        'hidden_size': opt.hidden_size,
+        'input_size': 8,
+        'output_size': 4 
+      }
 
     if opt.head_conv == -1: # init default head_conv
       opt.head_conv = 256 if 'dla' in opt.arch else 256
@@ -229,6 +243,8 @@ class opts(object):
       opt.img_size = (1088, 608)
       #opt.img_size = (864, 480)
       #opt.img_size = (576, 320)
+      if opt.forecast:
+        opt.heads.update({'fc': 256})
     else:
       assert 0, 'task not defined!'
     print('heads', opt.heads)
