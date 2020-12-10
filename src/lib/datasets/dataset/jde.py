@@ -408,6 +408,7 @@ class JointDataset(LoadImagesAndLabels):  # for training
             self.input_size = self.forecast['input_size']
             self.memory = {}
             self.memory_limit = opt.batch_size *  self.sequence_length
+            self.race = 0
 
         print('=' * 80)
         print('dataset summary')
@@ -421,10 +422,17 @@ class JointDataset(LoadImagesAndLabels):  # for training
         # print(len(self.memory))
         if len(self.memory) > self.memory_limit:
             keys = list(self.memory)
+            # print('current_keys', keys)
+
             while len(self.memory) > self.memory_limit:
-                self.memory.pop(keys.pop(0))
+                key = keys.pop(0)
+                self.memory.pop(key)
+                self.race -= 1
+                print('removed', key, self.race)
 
         self.memory[k] = v
+        self.race += 1
+        print(k, self.race)
 
     def get_from_memory(self, k):
         if k in self.memory:
@@ -460,10 +468,11 @@ class JointDataset(LoadImagesAndLabels):  # for training
             bb_hist = np.zeros(
                 (num_prev_frames, self.max_objs,  self.input_size), dtype=np.float32)
             forcast_mask = np.zeros((num_prev_frames,) , dtype=np.float32)
-            last_exist = (img_path, label_path)
+            real = (img_path, label_path)
 
-            last_label_path = label_path
-            for i in range(num_prev_frames):
+            curr_label_path = label_path
+            i = 0
+            while i < num_prev_frames:
                 prev_id = frame_id - (i + 1)
                 label_path_join = '/'.join(label_path_split[:-1])
                 prev_label_path = f"{label_path_join}/{prev_id:06d}.txt"
@@ -475,71 +484,101 @@ class JointDataset(LoadImagesAndLabels):  # for training
 
                         self.store_in_memory(prev_label_path, self.get_item(
                             prev_img_path, prev_label_path, ds))
-                    last_exist = (prev_img_path, prev_label_path)
+                    # real = (prev_img_path, prev_label_path)
                 else:
                     # augment data
-                    continue
+                    break # or continue if skip frame is implemented
                     self.store_in_memory(
-                        prev_label_path, self.get_item(*last_exist, ds))
+                        prev_label_path, self.get_item(*real, ds))
 
                 # calulate constant velocity
                 if True:  # dummy, used to collapse code
-                    curr_meta = self.get_from_memory(prev_label_path)
-                    prev_meta = self.get_from_memory(last_label_path)
+                    prev_meta = self.get_from_memory(prev_label_path)
+                    curr_meta = self.get_from_memory(curr_label_path)
+                    
+                    if curr_meta != None:
+                        if 'bb_hist' in curr_meta:
+                            print('No need for computation')
+                            curr_meta_bb_hist = curr_meta['bb_hist']
+                            idx = i+1
+                            l = curr_meta_bb_hist.shape[0] - idx
+                            bb_hist[idx: idx+l] = curr_meta_bb_hist[:l]
+                            i += l
+                            break
 
-                    if curr_meta == None or prev_meta == None:
-                        print(prev_label_path, "\n", last_label_path, "\n")
+                    if prev_meta == None or curr_meta == None:
+                        print(prev_label_path, f'is {prev_meta == None}', "\n", curr_label_path, f'is {curr_meta == None}', "\n")
                         continue
-                    curr_meta = copy.deepcopy(curr_meta)
                     prev_meta = copy.deepcopy(prev_meta)
+                    curr_meta = copy.deepcopy(curr_meta)
 
-                    bbox_curr = curr_meta['bbox']
                     bbox_prev = prev_meta['bbox']
+                    bbox_curr = curr_meta['bbox']
 
-                    ids_curr = curr_meta['ids']
                     ids_prev = prev_meta['ids']
+                    ids_curr = curr_meta['ids']
 
-                    num_of_objs_curr = ids_curr.argmax() + 1
                     num_of_objs_prev = ids_prev.argmax() + 1
+                    num_of_objs_curr = ids_curr.argmax() + 1
 
-                    ids_curr = ids_curr[:num_of_objs_curr]
                     ids_prev = ids_prev[:num_of_objs_prev]
+                    ids_curr = ids_curr[:num_of_objs_curr]
 
-                    common_ids, mask_curr, mask_prev = np.intersect1d(
-                        ids_curr, ids_prev, assume_unique=True, return_indices=True)
+                    common_ids, mask_prev, mask_curr = np.intersect1d(
+                        ids_prev, ids_curr, assume_unique=True, return_indices=True)
 
-                    bbox_curr = bbox_curr[mask_curr]
                     bbox_prev = bbox_prev[mask_prev]
+                    bbox_curr = bbox_curr[mask_curr]
 
                     v = np.zeros(
-                        (num_of_objs_curr, 8), dtype=np.float32)
-
-                    bbox_prev[:, 2:] -= bbox_prev[:, :2]
-                    bbox_prev[:, :2] += bbox_prev[:, 2:] / 2
+                        (num_of_objs_prev, 8), dtype=np.float32)
 
                     bbox_curr[:, 2:] -= bbox_curr[:, :2]
                     bbox_curr[:, :2] += bbox_curr[:, 2:] / 2
 
+                    bbox_prev[:, 2:] -= bbox_prev[:, :2]
+                    bbox_prev[:, :2] += bbox_prev[:, 2:] / 2
+
                     use_aspect_ratio = False
                     if use_aspect_ratio:
-                        bbox_prev[:, 2] /= bbox_prev[:, 3]
                         bbox_curr[:, 2] /= bbox_curr[:, 3]
+                        bbox_prev[:, 2] /= bbox_prev[:, 3]
 
 
-                    v[mask_curr, :4] = bbox_curr
-                    v[mask_curr, 4:] = bbox_curr - bbox_prev
+                    v[mask_prev, :4] = bbox_prev
+                    v[mask_prev, 4:] = bbox_prev - bbox_curr
 
                     if self.input_size == 9:
                         v = np.pad(v, [(0,0),(1,0)], mode='constant', constant_values=0)
-                        v[mask_curr, 0] = ids_curr[mask_curr] / self.nID
+                        v[mask_prev, 0] = ids_prev[mask_prev] / self.nID
 
-                    bb_hist[i, :num_of_objs_curr] = v
+                    bb_hist[i, :num_of_objs_prev] = v
                     forcast_mask[i] = 1
 
-                # if i == 0:
-                    # if "hidden_state" in curr_meta:
+                    # there is no neeedd to calculate prev bb_hist if it already exist
+                    if 'bb_hist' in curr_meta:
+                        print('weird scenario')
+                        # curr_meta_bb_hist = curr_meta['bb_hist']
+                        # idx = i+1
+                        # l = curr_meta_bb_hist.shape[0] - idx
+                        # bb_hist[idx: idx+l] = curr_meta_bb_hist[:l]
+                        # i += l
 
-                    #     ret['hidden_state'] = curr_meta['hidden_state']
+
+                    if 'bb_hist' in prev_meta:
+                        prev_meta_bb_hist = prev_meta['bb_hist']
+                        idx = i+1
+                        l = prev_meta_bb_hist.shape[0] - idx
+                        bb_hist[idx: idx+l] = prev_meta_bb_hist[:l]
+                        i += l
+
+
+                    
+
+                # if i == 0:
+                    # if "hidden_state" in prev_meta:
+
+                    #     ret['hidden_state'] = prev_meta['hidden_state']
                     # else:
                     #     ret['hidden_state'] = np.concatenate((np.random.rand(self.max_objs, self.hidden_size), np.random.rand(
                     #         self.max_objs, self.hidden_size)), axis=0).astype(np.float32)
@@ -547,8 +586,8 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 # prev_bboxes[i] = copy.deepcopy(self.memory[prev_label_path]['bbox'])
                 # prev_inputs[i] = copy.deepcopy(self.memory[prev_label_path]['input'])
 
-                last_label_path = prev_label_path
-
+                curr_label_path = prev_label_path
+                i += 1
             # ret['prev_inputs'] = prev_inputs
             # ret['prev_bboxes'] = prev_bboxes
             ret['bb_hist'] = bb_hist
@@ -557,6 +596,10 @@ class JointDataset(LoadImagesAndLabels):  # for training
         return ret
 
     def get_item(self, img_path, label_path, ds):
+
+        if self.forecast and label_path in self.memory:
+            return self.memory[label_path]
+
         imgs, labels, img_path, (input_h, input_w) = self.get_data(img_path, label_path)
         for i, _ in enumerate(labels):
             if labels[i, 1] > -1:
@@ -621,6 +664,8 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 bbox_xys[k] = bbox_xy
 
         ret = {'input': imgs, 'hm': hm, 'reg_mask': reg_mask, 'ind': ind, 'wh': wh, 'reg': reg, 'ids': ids, 'bbox': bbox_xys}
+        if self.forecast:
+            self.store_in_memory(label_path, ret)
         return ret
 
 
