@@ -482,8 +482,10 @@ class JointDataset(LoadImagesAndLabels):  # for training
                         "labels_with_ids", "images").replace("txt", img_ext)
                     if prev_label_path not in self.memory:
 
-                         self.get_item(
+                        prev_meta = self.get_item(
                             prev_img_path, prev_label_path, ds)
+                    else:
+                        prev_meta = self.get_from_memory(prev_label_path)
                     # real = (prev_img_path, prev_label_path)
                 else:
                     # augment data
@@ -493,7 +495,7 @@ class JointDataset(LoadImagesAndLabels):  # for training
 
                 # calulate constant velocity
                 if True:  # dummy, used to collapse code
-                    prev_meta = self.get_from_memory(prev_label_path)
+                    # prev_meta = self.get_from_memory(prev_label_path)
                     curr_meta = self.get_from_memory(curr_label_path)
                     
                     if curr_meta != None:
@@ -507,7 +509,7 @@ class JointDataset(LoadImagesAndLabels):  # for training
                             break
 
                     if prev_meta == None or curr_meta == None:
-                        print(prev_label_path, f'is {prev_meta == None}', "\n", curr_label_path, f'is {curr_meta == None}', "\n")
+                        print(prev_label_path, f'is {prev_meta == None}', curr_label_path, f'is {curr_meta == None}', "\n")
                         continue
                     prev_meta = copy.deepcopy(prev_meta)
                     curr_meta = copy.deepcopy(curr_meta)
