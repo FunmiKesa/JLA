@@ -471,6 +471,7 @@ class JointDataset(LoadImagesAndLabels):  # for training
             real = (img_path, label_path)
 
             curr_label_path = label_path
+            curr_meta = ret
             i = 0
             while i < num_prev_frames:
                 prev_id = frame_id - (i + 1)
@@ -496,7 +497,6 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 # calulate constant velocity
                 if True:  # dummy, used to collapse code
                     # prev_meta = self.get_from_memory(prev_label_path)
-                    curr_meta = self.get_from_memory(curr_label_path)
                     
                     if curr_meta != None:
                         if 'bb_hist' in curr_meta:
@@ -589,6 +589,7 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 # prev_inputs[i] = copy.deepcopy(self.memory[prev_label_path]['input'])
 
                 curr_label_path = prev_label_path
+                curr_meta = prev_meta
                 i += 1
             # ret['prev_inputs'] = prev_inputs
             # ret['prev_bboxes'] = prev_bboxes
