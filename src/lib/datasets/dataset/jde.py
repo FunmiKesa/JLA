@@ -409,8 +409,6 @@ class JointDataset(LoadImagesAndLabels):  # for training
             self.memory = {}
             self.memory_limit = opt.batch_size *  self.sequence_length
             self.race = 0
-            import uuid
-            self.uuid = uuid.uuid4()
 
         print('=' * 80)
         print('dataset summary')
@@ -430,11 +428,11 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 key = keys.pop(0)
                 self.memory.pop(key)
                 self.race -= 1
-                print('\nremoved', self.uuid , key, self.race, '\n')
+                print('\nremoved', key, self.race, '\n')
 
         self.memory[k] = v
         self.race += 1
-        print('\n',self.uuid, k, self.race, '\n')
+        print('\n', k, self.race, '\n')
 
     def get_from_memory(self, k):
         if k in self.memory:
@@ -484,8 +482,8 @@ class JointDataset(LoadImagesAndLabels):  # for training
                         "labels_with_ids", "images").replace("txt", img_ext)
                     if prev_label_path not in self.memory:
 
-                        self.store_in_memory(prev_label_path, self.get_item(
-                            prev_img_path, prev_label_path, ds))
+                         self.get_item(
+                            prev_img_path, prev_label_path, ds)
                     # real = (prev_img_path, prev_label_path)
                 else:
                     # augment data
