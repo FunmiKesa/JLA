@@ -17,8 +17,9 @@ from torchvision.transforms import transforms as T
 from cython_bbox import bbox_overlaps as bbox_ious
 from opts import opts
 from utils.image import gaussian_radius, draw_umich_gaussian, draw_msra_gaussian
-from utils.utils import xyxy2xywh, generate_anchors, xywh2xyxy, encode_delta
+from utils.utils import xyxy2xywh, generate_anchors, xywh2xyxy, encode_delta, load_txt
 
+import pandas as pd
 
 class LoadImages:  # for inference
     def __init__(self, path, img_size=(1088, 608)):
@@ -71,7 +72,7 @@ class LoadImages:  # for inference
 
         # Padded resize
         img, _, _, _ = letterbox(img0, height=self.height, width=self.width)
-
+        #TODO: FORECASTING PREVIOUS LABELS
         # Normalize RGB
         img = img[:, :, ::-1].transpose(2, 0, 1)
         img = np.ascontiguousarray(img, dtype=np.float32)
@@ -346,7 +347,7 @@ def collate_fn(batch):
     return imgs, filled_labels, paths, sizes, labels_len.unsqueeze(1)
 
 
-class JointDataset(LoadImagesAndLabels):  # for training
+class JointDataset2(LoadImagesAndLabels):  # for training
     default_resolution = [1088, 608]
     mean = None
     std = None
@@ -402,16 +403,17 @@ class JointDataset(LoadImagesAndLabels):  # for training
 
         self.forecast = opt.forecast
         if self.forecast:
-            self.sequence_length = self.forecast['sequence_length']
-            self.forecast_length = self.forecast['forecast_length']
+            self.past_length = self.forecast['past_length']
+            self.future_length = self.forecast['future_length']
             self.hidden_size = self.forecast['hidden_size']
             self.input_size = self.forecast['input_size']
             self.memory = {}
-            self.memory_limit = opt.batch_size *  self.sequence_length
+            self.memory_limit = opt.batch_size *  self.past_length
             self.race = 0
 
         print('=' * 80)
         print('dataset summary')
+        
         print(self.tid_num)
         print('total # identities:', self.nID)
         print('start index')
@@ -428,11 +430,11 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 key = keys.pop(0)
                 self.memory.pop(key)
                 self.race -= 1
-                print('\nremoved', key, self.race, '\n')
+                # print('\nremoved', key, self.race, '\n')
 
         self.memory[k] = v
         self.race += 1
-        print('\n', k, self.race, '\n')
+        # print('\n', k, self.race, '\n')
 
     def get_from_memory(self, k):
         if k in self.memory:
@@ -455,11 +457,11 @@ class JointDataset(LoadImagesAndLabels):  # for training
             # if label_path not in self.memory:
             #     self.store_in_memory(label_path, ret)
 
-            # get the previous [sequence_length] frames if it exist else augment data
+            # get the previous [past_length] frames if it exist else augment data
             label_path_split = label_path.split('/')
             img_ext = img_path.split('.')[-1]
             frame_id = int(label_path_split[-1].replace(".txt", ""))
-            num_prev_frames = self.sequence_length
+            num_prev_frames = self.past_length
             # prev_bboxes = np.zeros(
                 # (num_prev_frames, *ret['bbox'].shape), dtype=np.float32)
             # prev_inputs = np.zeros(
@@ -603,7 +605,7 @@ class JointDataset(LoadImagesAndLabels):  # for training
         if self.forecast and label_path in self.memory:
             return self.memory[label_path]
 
-        imgs, labels, img_path, (input_h, input_w) = self.get_data(img_path, label_path)
+        imgs, labels, img_path, (input_h, input_w), (ratio, padw, padh) = self.get_data(img_path, label_path)
         for i, _ in enumerate(labels):
             if labels[i, 1] > -1:
                 labels[i, 1] += self.tid_start_index[ds]
@@ -669,6 +671,254 @@ class JointDataset(LoadImagesAndLabels):  # for training
         ret = {'input': imgs, 'hm': hm, 'reg_mask': reg_mask, 'ind': ind, 'wh': wh, 'reg': reg, 'ids': ids, 'bbox': bbox_xys}
         if self.forecast:
             self.store_in_memory(label_path, ret)
+        return ret
+
+
+class JointDataset(LoadImagesAndLabels):  # for training
+    default_resolution = [1088, 608]
+    mean = None
+    std = None
+    num_classes = 1
+
+    def __init__(self, opt, root, paths, img_size=(1088, 608), augment=False, transforms=None):
+        self.opt = opt
+        dataset_names = paths.keys()
+        self.img_files = OrderedDict()
+        self.label_files = OrderedDict()
+        self.tid_num = OrderedDict()
+        self.tid_start_index = OrderedDict()
+        self.num_classes = 1
+
+        self.forecast = opt.forecast
+        if self.forecast:
+            self.past_length = self.forecast['past_length']
+            self.future_length = self.forecast['future_length']
+            self.hidden_size = self.forecast['hidden_size']
+            self.input_size = self.forecast['input_size']
+            self.output_size = self.forecast['output_size']
+            self.memory = {}
+            self.memory_limit = opt.batch_size *  self.past_length
+            self.race = 0
+            # l = [[f"x_{i}", f"y_{i}", f"w_{i}", f"h_{i}"] for i in range(1, self.future_length) ]
+            # l = np.concatenate(l, axis=0)
+            # l = ["fid"] + list(l)
+            # self.forecast_header = ["fid"] + list(l)
+
+            self.forecast_future_files = OrderedDict()
+            self.forecast_past_files = OrderedDict()
+
+        for ds, path in paths.items():
+            with open(path, 'r') as file:
+                self.img_files[ds] = file.readlines()
+                self.img_files[ds] = [osp.join(root, x.strip()) for x in self.img_files[ds]]
+                self.img_files[ds] = list(filter(lambda x: len(x) > 0, self.img_files[ds]))
+
+            self.label_files[ds] = [
+                x.replace('images', 'labels_with_ids').replace('.png', '.txt').replace('.jpg', '.txt')
+                for x in self.img_files[ds]]
+
+            if self.forecast:
+                self.forecast_future_files[ds] = [x.replace('img1', 'future') for x in self.label_files[ds]]
+                self.forecast_past_files[ds] = [x.replace('img1', 'past') for x in self.label_files[ds]]
+
+        for ds, label_paths in self.label_files.items():
+            max_index = -1
+            for lp in label_paths:
+                lb = np.loadtxt(lp)
+                if len(lb) < 1:
+                    continue
+                if len(lb.shape) < 2:
+                    img_max = lb[1]
+                else:
+                    img_max = np.max(lb[:, 1])
+                if img_max > max_index:
+                    max_index = img_max
+            self.tid_num[ds] = max_index + 1
+
+        last_index = 0
+        for i, (k, v) in enumerate(self.tid_num.items()):
+            self.tid_start_index[k] = last_index
+            last_index += v
+
+        self.nID = int(last_index + 1)
+        self.nds = [len(x) for x in self.img_files.values()]
+        self.cds = [sum(self.nds[:i]) for i in range(len(self.nds))]
+        self.nF = sum(self.nds)
+        self.width = img_size[0]
+        self.height = img_size[1]
+        self.max_objs = opt.K
+        self.augment = augment
+        self.transforms = transforms
+
+        print('=' * 80)
+        print('dataset summary')
+        
+        print(self.tid_num)
+        print('total # identities:', self.nID)
+        print('start index')
+        print(self.tid_start_index)
+        print('=' * 80)
+
+    def store_in_memory(self, k, v):
+        # print(len(self.memory))
+        if len(self.memory) > self.memory_limit:
+            keys = list(self.memory)
+            # print('current_keys', keys)
+
+            while len(self.memory) > self.memory_limit:
+                key = keys.pop(0)
+                self.memory.pop(key)
+                self.race -= 1
+                # print('\nremoved', key, self.race, '\n')
+
+        self.memory[k] = v
+        self.race += 1
+        # print('\n', k, self.race, '\n')
+
+    def get_from_memory(self, k):
+        if k in self.memory:
+            return self.memory[k]
+        return None
+
+    def __getitem__(self, files_index):
+
+        for i, c in enumerate(self.cds):
+            if files_index >= c:
+                ds = list(self.label_files.keys())[i]
+                start_index = c
+
+        img_path = self.img_files[ds][files_index - start_index]
+        label_path = self.label_files[ds][files_index - start_index]
+
+
+        imgs, labels, img_path, (input_h, input_w) = self.get_data(img_path, label_path)
+        for i, _ in enumerate(labels):
+            if labels[i, 1] > -1:
+                labels[i, 1] += self.tid_start_index[ds]
+
+        output_h = imgs.shape[1] // self.opt.down_ratio
+        output_w = imgs.shape[2] // self.opt.down_ratio
+        num_classes = self.num_classes
+        num_objs = labels.shape[0]
+        hm = np.zeros((num_classes, output_h, output_w), dtype=np.float32)
+        if self.opt.ltrb:
+            wh = np.zeros((self.max_objs, 4), dtype=np.float32)
+        else:
+            wh = np.zeros((self.max_objs, 2), dtype=np.float32)
+        reg = np.zeros((self.max_objs, 2), dtype=np.float32)
+        ind = np.zeros((self.max_objs, ), dtype=np.int64)
+        reg_mask = np.zeros((self.max_objs, ), dtype=np.uint8)
+        ids = np.zeros((self.max_objs, ), dtype=np.int64)
+        bbox_xys = np.zeros((self.max_objs, 4), dtype=np.float32)
+
+        draw_gaussian = draw_msra_gaussian if self.opt.mse_loss else draw_umich_gaussian
+        for k in range(num_objs):
+            label = labels[k]
+            bbox = label[2:]
+            cls_id = int(label[0])
+            bbox[[0, 2]] = bbox[[0, 2]] * output_w
+            bbox[[1, 3]] = bbox[[1, 3]] * output_h
+            bbox_amodal = copy.deepcopy(bbox)
+            bbox_amodal[0] = bbox_amodal[0] - bbox_amodal[2] / 2.
+            bbox_amodal[1] = bbox_amodal[1] - bbox_amodal[3] / 2.
+            bbox_amodal[2] = bbox_amodal[0] + bbox_amodal[2]
+            bbox_amodal[3] = bbox_amodal[1] + bbox_amodal[3]
+            bbox[0] = np.clip(bbox[0], 0, output_w - 1)
+            bbox[1] = np.clip(bbox[1], 0, output_h - 1)
+            h = bbox[3]
+            w = bbox[2]
+
+            bbox_xy = copy.deepcopy(bbox)
+            bbox_xy[0] = bbox_xy[0] - bbox_xy[2] / 2
+            bbox_xy[1] = bbox_xy[1] - bbox_xy[3] / 2
+            bbox_xy[2] = bbox_xy[0] + bbox_xy[2]
+            bbox_xy[3] = bbox_xy[1] + bbox_xy[3]
+
+            if h > 0 and w > 0:
+                radius = gaussian_radius((math.ceil(h), math.ceil(w)))
+                radius = max(0, int(radius))
+                radius = 6 if self.opt.mse_loss else radius
+                #radius = max(1, int(radius)) if self.opt.mse_loss else radius
+                ct = np.array(
+                    [bbox[0], bbox[1]], dtype=np.float32)
+                ct_int = ct.astype(np.int32)
+                draw_gaussian(hm[cls_id], ct_int, radius)
+                if self.opt.ltrb:
+                    wh[k] = ct[0] - bbox_amodal[0], ct[1] - bbox_amodal[1], \
+                            bbox_amodal[2] - ct[0], bbox_amodal[3] - ct[1]
+                else:
+                    wh[k] = 1. * w, 1. * h
+                ind[k] = ct_int[1] * output_w + ct_int[0]
+                reg[k] = ct - ct_int
+                reg_mask[k] = 1
+                ids[k] = label[1]
+                bbox_xys[k] = bbox_xy
+
+        ret = {'input': imgs, 'hm': hm, 'reg_mask': reg_mask, 'ind': ind, 'wh': wh, 'reg': reg, 'ids': ids, 'bbox': bbox_xys}
+        if self.forecast:
+            # load and transform forecast labels as well
+            futures = np.zeros((self.max_objs, self.future_length, self.output_size), dtype=np.float32)
+            pasts = np.zeros((self.max_objs, self.past_length, self.input_size), dtype=np.float32)
+            futures_mask = np.zeros((self.max_objs, self.future_length, self.output_size) , dtype=np.uint8)
+            futures_inds = np.zeros((self.max_objs) , dtype=np.int64)
+            pasts_mask = np.zeros((self.max_objs, self.past_length, self.input_size) , dtype=np.uint8)
+            pasts_inds = np.zeros((self.max_objs) , dtype=np.int64)
+
+
+            ratio = min(float(self.height) / input_h, float(self.width) / input_w)
+            rw = ratio * input_w / self.width
+            rh = ratio * input_h / self.height
+
+            forecast_future_path = self.forecast_future_files[ds][files_index - start_index]
+            if os.path.exists(forecast_future_path):
+                column_length = self.future_length * self.output_size +1
+                forecasts, mask = load_txt(forecast_future_path, column_length, max_column=361)
+                inds = forecasts[:, 0]
+                forecasts = forecasts[:, 1:]
+                n = forecasts.shape[-1] // self.output_size
+                mask = mask[:, 1:].reshape(mask.shape[0],n, self.output_size)
+                futures_mask[:mask.shape[0], :] = mask
+                futures_inds[:mask.shape[0]] = inds
+
+                forecasts = forecasts.reshape(forecasts.shape[0], n, self.output_size)
+
+                bbox_xyxy = forecasts.copy()
+                bbox_xyxy[..., [0,2]] *= rw
+                bbox_xyxy[..., [1,3]] *= rh
+
+                futures[:bbox_xyxy.shape[0], :] = bbox_xyxy
+
+            ret['futures'] = futures
+            ret['futures_mask'] = futures_mask
+            ret['futures_inds'] = futures_inds
+
+
+            forecast_past_path = self.forecast_past_files[ds][files_index - start_index]
+            if os.path.exists(forecast_past_path):
+                column_length = self.past_length * self.input_size + 1
+                forecasts, mask = load_txt(forecast_past_path, column_length, max_column=241)
+                inds = forecasts[:, 0]
+                forecasts = forecasts[:, 1:]
+                n = forecasts.shape[-1] // self.input_size
+                mask = mask[:, 1:].reshape(mask.shape[0], n, self.input_size)
+                pasts_mask[:mask.shape[0], :] = mask
+                pasts_inds[:mask.shape[0]] = inds
+
+                forecasts = forecasts.reshape(forecasts.shape[0], n, self.input_size)
+                bbox_xyxy = forecasts.copy()
+
+                bbox_xyxy[..., [0, 2, 4, 6]] *= rw
+                bbox_xyxy[..., [1, 3, 5, 7]] *= rh
+
+                pasts[:bbox_xyxy.shape[0], :] = bbox_xyxy
+
+            # augment future labels
+            ret['pasts'] = pasts
+            ret['pasts_mask'] = pasts_mask
+            ret['pasts_inds'] = pasts_inds
+
+            # change input array to two dimensional
+
         return ret
 
 

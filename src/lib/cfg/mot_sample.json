@@ -1,0 +1,15 @@
+{
+    "root":"../data/MOT",
+    "train":
+    {
+        "mot20":"./data/mot_sample2.train"
+    },
+    "test_emb":
+    {
+        "mot20":"./data/mot_sample2.train"
+    },
+    "test":
+    {
+        "mot20":"./data/mot_sample2.val"
+    }
+}

@@ -47,7 +47,7 @@ class opts(object):
                              help='visualization threshold.')
     
     # model
-    self.parser.add_argument('--arch', default='rnnforecast_34', 
+    self.parser.add_argument('--arch', default='dla_34', 
                              help='model architecture. Currently tested'
                                   'resdcn_34 | resdcn_50 | resfpndcn_34 |'
                                   'dla_34 | hrnet_18')
@@ -143,6 +143,10 @@ class opts(object):
                              help='reid loss: ce | triplet')
     self.parser.add_argument('--id_weight', type=float, default=1,
                              help='loss weight for id')
+    self.parser.add_argument('--pasts_weight', type=float, default=1,
+                             help='loss weight for past frames')
+    self.parser.add_argument('--futures_weight', type=float, default=1,
+                             help='loss weight for future frames')
     self.parser.add_argument('--reid_dim', type=int, default=128,
                              help='feature dim for reid')
     self.parser.add_argument('--ltrb', default=True,
@@ -159,8 +163,8 @@ class opts(object):
                              help='not regress local offset.')
     self.parser.add_argument('--forecast', action='store_true',
                              help='not forecast bounding location')                     
-    self.parser.add_argument('--sequence_length', type=int, default=10, help='Number of previous frames to use in forecasting')
-    self.parser.add_argument('--forecast_length', type=int, default=5, help='Number of future frames forecast')
+    self.parser.add_argument('--past_length', type=int, default=10, help='Number of previous frames to use in forecasting')
+    self.parser.add_argument('--future_length', type=int, default=5, help='Number of future frames forecast')
     self.parser.add_argument('--hidden_size', type=int, default=512, help='Size of the RNN hidden layer')
 
   def parse(self, args=''):
@@ -180,8 +184,8 @@ class opts(object):
 
     if opt.forecast:
       opt.forecast = {
-        'forecast_length': opt.forecast_length,
-        'sequence_length': opt.sequence_length,
+        'future_length': opt.future_length,
+        'past_length': opt.past_length,
         'hidden_size': opt.hidden_size,
         'input_size': 8,
         'output_size': 4 
@@ -243,8 +247,8 @@ class opts(object):
       opt.img_size = (1088, 608)
       #opt.img_size = (864, 480)
       #opt.img_size = (576, 320)
-      if opt.forecast:
-        opt.heads.update({'fc': 256})
+      # if opt.forecast:
+      #   opt.heads.update({'fct': 256})
     else:
       assert 0, 'task not defined!'
     print('heads', opt.heads)

@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import torch
 import numpy as np
+import pandas as pd
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -27,20 +28,20 @@ class AverageMeter(object):
 def xyxy2xywh(x):
     # Convert bounding box format from [x1, y1, x2, y2] to [x, y, w, h]
     y = torch.zeros(x.shape) if x.dtype is torch.float32 else np.zeros(x.shape)
-    y[:, 0] = (x[:, 0] + x[:, 2]) / 2
-    y[:, 1] = (x[:, 1] + x[:, 3]) / 2
-    y[:, 2] = x[:, 2] - x[:, 0]
-    y[:, 3] = x[:, 3] - x[:, 1]
+    y[..., 0] = (x[..., 0] + x[..., 2]) / 2
+    y[..., 1] = (x[..., 1] + x[..., 3]) / 2
+    y[..., 2] = x[..., 2] - x[..., 0]
+    y[..., 3] = x[..., 3] - x[..., 1]
     return y
 
 
 def xywh2xyxy(x):
     # Convert bounding box format from [x, y, w, h] to [x1, y1, x2, y2]
     y = torch.zeros(x.shape) if x.dtype is torch.float32 else np.zeros(x.shape)
-    y[:, 0] = (x[:, 0] - x[:, 2] / 2)
-    y[:, 1] = (x[:, 1] - x[:, 3] / 2)
-    y[:, 2] = (x[:, 0] + x[:, 2] / 2)
-    y[:, 3] = (x[:, 1] + x[:, 3] / 2)
+    y[..., 0] = (x[..., 0] - x[..., 2] / 2)
+    y[..., 1] = (x[..., 1] - x[..., 3] / 2)
+    y[..., 2] = (x[..., 0] + x[..., 2] / 2)
+    y[..., 3] = (x[..., 1] + x[..., 3] / 2)
     return y
 
 def ap_per_class(tp, conf, pred_cls, target_cls):
@@ -177,3 +178,21 @@ def encode_delta(gt_box_list, fg_anchor_list):
     dw = np.log(gw/pw)
     dh = np.log(gh/ph)
     return np.stack((dx, dy, dw, dh), axis=1)
+
+
+def load_txt(filepath, column_length, max_column=400):
+    header = [f"h_{i}" for i in range(max_column+5)]
+    columns = [f"h_{i}" for i in range(column_length)]
+    data = pd.read_csv(filepath, sep=" ", names=header)
+    # data.dropna(axis=1, inplace=True)
+    if column_length <= data.shape[1]:
+        data = data[columns]
+    data = data.values
+    
+    mask = (~ np.isnan(data)).astype(np.int)
+
+    # change nan values to 0
+    data = np.nan_to_num(data)
+
+    return data, mask
+    

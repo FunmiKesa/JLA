@@ -228,8 +228,8 @@ class JDETracker(object):
 
         self.forecast = opt.forecast
         if self.forecast:
-            self.sequence_length = self.forecast['sequence_length']
-            self.forecast_length = self.forecast['forecast_length']
+            self.past_length = self.forecast['past_length']
+            self.future_length = self.forecast['future_length']
             self.hidden_size = self.forecast['hidden_size']
             self.input_size = self.forecast['input_size']
             self.output_size = self.forecast['output_size']

@@ -3,8 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 
-from models.networks.forecast_rnn import EncoderRNN, DecoderRNN
-from models.utils import _sigmoid, _tranpose_and_gather_feat
+from models.networks.forecast_rnn import ForeCastRNN
 
 import os
 import math
@@ -490,20 +489,20 @@ class DLASeg(nn.Module):
         return [z]
 
 
-def get_pose_net(num_layers, heads, head_conv=256, down_ratio=4, nID=1, forecast=None, device='cuda'):
+def get_pose_net(num_layers, heads, head_conv=256, down_ratio=4, forecast=None, device='cuda'):
     model = RNNForecast('dla{}'.format(num_layers), heads,
                         pretrained=True,
                         down_ratio=down_ratio,
                         final_kernel=1,
                         last_level=5,
-                        head_conv=head_conv, forecast=forecast, device=device,
-                        nID=nID)
+                        head_conv=head_conv, forecast=forecast, device=device
+                        )
     return model
 
 
 class RNNForecast(nn.Module):
     def __init__(self, base_name, heads, pretrained, down_ratio, final_kernel,
-                 last_level, head_conv, out_channel=0, forecast=None, device='cuda', nID=1):
+                 last_level, head_conv, out_channel=0, forecast=None, device='cuda'):
         super(RNNForecast, self).__init__()
 
         assert down_ratio in [2, 4, 8, 16]
@@ -520,7 +519,15 @@ class RNNForecast(nn.Module):
 
         self.ida_up = IDAUp(out_channel, channels[self.first_level:self.last_level],
                             [2 ** i for i in range(self.last_level - self.first_level)])
+        self.forecast = forecast
+        if self.forecast:
+            input_size = forecast['input_size']
+            hidden_size = forecast['hidden_size']
+            output_size = forecast['output_size']
+            future_length = forecast['future_length']
 
+            self.rnn = ForeCastRNN(device, input_size, output_size, future_length, hidden_size, 1, 0)
+            
         self.heads = heads
         for head in self.heads:
             classes = self.heads[head]
@@ -547,23 +554,14 @@ class RNNForecast(nn.Module):
             self.__setattr__(head, fc)
 
             self.emb_dim = self.heads['id']
-            self.nID = nID
             self.device = device
 
-            self.reid = nn.Linear(self.emb_dim, self.nID)
-            self.forecast = forecast
-            if self.forecast:
-                input_size = forecast['input_size']
-                hidden_size = forecast['hidden_size']
-                output_size = forecast['output_size']
+            
 
-                # self.rnn = ForeCastRNN(input_size, hidden_size)
-                self.encoder = EncoderRNN(
-                    self.device, input_size, hidden_size, 1)
-                self.decoder = DecoderRNN(
-                    self.device, input_size, output_size, hidden_size, 0, 1)
-
-    def forward(self, x, batch=None, val=False):
+    def forward(self, x):
+        if self.forecast:
+            prev = x[-1]
+            x = x[0]
         x = self.base(x)
         x = self.dla_up(x)
 
@@ -575,22 +573,12 @@ class RNNForecast(nn.Module):
         z = {}
         for head in self.heads:
             z[head] = self.__getattr__(head)(y[-1])
+
+        if self.forecast:
+            # f = z['fct']
+            # fs = f.shape
+            # f =  f.permute(0,2,3,1).contiguous().view(-1, fs[1]).contiguous()
+            z['fct'] = self.rnn(prev)
+        
         output = [z]
-        if val and self.forecast:
-            fc = z['fc']
-            forecast_length = self.forecast['forecast_length']
-
-            batch_size, conv, height, width = fc.shape
-            fc = _tranpose_and_gather_feat(fc, batch['ind']).view(
-                batch_size, -1, conv).squeeze(0)
-
-            target = batch['bb_hist']
-            batch_size, sequence_length, max_objs, input_size = target.shape
-            target = target.permute(1, 0, 2, 3).contiguous().view
-
-            fc_all = fc.view(-1, fc.size(2)).contiguous()
-            context = self.encoder(target)
-            decoded_input, pred = self.decoder(
-                context, fc_all, forecast_length=forecast_length, sequence_length=sequence_length, val=val)
-            output += [pred]
         return output
