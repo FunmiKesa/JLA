@@ -55,6 +55,19 @@ def main(opt):
         drop_last=True
     )
 
+    # validate
+    valset_paths = data_config['test']
+    val_dataset = Dataset(opt, dataset_root, valset_paths, (1088, 608), augment=False, transforms=transforms)
+    val_loader = torch.utils.data.DataLoader(
+        val_dataset,
+        batch_size=opt.batch_size,
+        shuffle=False,
+        num_workers=opt.num_workers,
+        pin_memory=True,
+        drop_last=True
+    )
+
+
     print('Starting training...')
     Trainer = train_factory[opt.task]
     trainer = Trainer(opt, model, optimizer)
@@ -71,6 +84,11 @@ def main(opt):
         logger.write('epoch: {} |'.format(epoch))
         for k, v in log_dict_train.items():
             logger.scalar_summary('train_{}'.format(k), v, epoch)
+            logger.write('{} {:8f} | '.format(k, v))
+        with torch.no_grad():
+            val_log_dict_train, _ = trainer.val(epoch, val_loader)
+        for k, v in val_log_dict_train.items():
+            logger.scalar_summary('val_{}'.format(k), v, epoch)
             logger.write('{} {:8f} | '.format(k, v))
 
         if opt.val_intervals > 0 and epoch % opt.val_intervals == 0:
