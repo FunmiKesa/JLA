@@ -46,8 +46,8 @@ class MotLoss(torch.nn.Module):
             # self.encoder = EncoderRNN(self.opt.device, input_size, hidden_size, 1)
             # self.decoder = DecoderRNN(self.opt.device,input_size, output_size, hidden_size, 0, 1)
 
-            # self.FCTLoss = nn.MSELoss()
-            self.s_fct = nn.Parameter(-1.85 * torch.ones(1))
+            self.FCTLoss = nn.MSELoss()
+            self.s_fct = nn.Parameter(torch.ones(1))
 
     def forward(self, outputs, batch):
         opt = self.opt
@@ -144,12 +144,15 @@ class MotLoss(torch.nn.Module):
                     pred_pasts = pred_pasts * pasts_mask.float()
                     pasts = pasts * pasts_mask.float()
 
-                    # pasts = pasts.flip([1])
+                    pasts = pasts.flip([1])
                     index = math.ceil(input_size / 2)
 
                     pasts[:, :, :, index:] = pasts[:, :, :, index:] * -1 # reverse direction
 
-                    pasts_loss = pasts_loss  + F.l1_loss(pred_pasts, pasts, size_average=False) / (pasts_mask.sum([0,1]).max() + 1e-4) 
+                    # print(pasts_mask.sum([0,1]).max())
+
+
+                    pasts_loss = pasts_loss  + F.l1_loss(pred_pasts, pasts, size_average=False) / (pasts_mask.sum([0,1]).max().float()  + 1e-4) 
 
                 if opt.futures_weight:
                     # futures_mask = futures_mask.unsqueeze(-1).unsqueeze(-1).expand_as(futures)
@@ -166,8 +169,9 @@ class MotLoss(torch.nn.Module):
 
                     futures = futures * futures_mask.float()
 
+                    # print(futures_mask.sum([0,1]).max())
                     futures_loss += F.l1_loss(pred_futures, futures, size_average=False) / (
-                        futures_mask.sum([0,1]).max() + 1e-4) / opt.num_stacks
+                        futures_mask.sum([0,1]).max().float() + 1e-4) / opt.num_stacks
 
                 # fct_loss += self.FCLoss(decoded_input * forecast_mask, target * forecast_mask) / opt.num_stacks
 

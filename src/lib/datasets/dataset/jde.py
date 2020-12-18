@@ -886,7 +886,7 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 bbox_xyxy[..., [0,2]] *= rw
                 bbox_xyxy[..., [1,3]] *= rh
 
-                futures[:bbox_xyxy.shape[0], :] = bbox_xyxy
+                futures[:bbox_xyxy.shape[0], ...] = bbox_xyxy
 
             ret['futures'] = futures
             ret['futures_mask'] = futures_mask
@@ -910,7 +910,7 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 bbox_xyxy[..., [0, 2, 4, 6]] *= rw
                 bbox_xyxy[..., [1, 3, 5, 7]] *= rh
 
-                pasts[:bbox_xyxy.shape[0], :] = bbox_xyxy
+                pasts[:bbox_xyxy.shape[0], ...] = bbox_xyxy
 
             # augment future labels
             ret['pasts'] = pasts
