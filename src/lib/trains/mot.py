@@ -152,7 +152,7 @@ class MotLoss(torch.nn.Module):
                     # print(pasts_mask.sum([0,1]).max())
 
 
-                    pasts_loss = pasts_loss  + F.l1_loss(pred_pasts, pasts, size_average=False) / (pasts_mask.sum([0,1]).max().float()  + 1e-4) 
+                    pasts_loss = pasts_loss  + F.l1_loss(pred_pasts, pasts, size_average=False) / (pasts_mask.sum([0,1]).max().float()  + 1e-4) / opt.num_stacks
 
                 if opt.futures_weight:
                     # futures_mask = futures_mask.unsqueeze(-1).unsqueeze(-1).expand_as(futures)
@@ -170,7 +170,7 @@ class MotLoss(torch.nn.Module):
                     futures = futures * futures_mask.float()
 
                     # print(futures_mask.sum([0,1]).max())
-                    futures_loss += F.l1_loss(pred_futures, futures, size_average=False) / (
+                    futures_loss = futures_loss + F.l1_loss(pred_futures, futures, size_average=False) / (
                         futures_mask.sum([0,1]).max().float() + 1e-4) / opt.num_stacks
 
                 # fct_loss += self.FCLoss(decoded_input * forecast_mask, target * forecast_mask) / opt.num_stacks
@@ -191,6 +191,7 @@ class MotLoss(torch.nn.Module):
         if self.opt.forecast:
             loss += torch.exp(-self.s_fct) * fct_loss + self.s_fct
         loss *= 0.5
+        print(self.s_det, torch.exp(-self.s_det) * det_loss, self.s_id, torch.exp(-self.s_id) * id_loss,  self.s_fct, torch.exp(-self.s_fct) * fct_loss)
         #loss = det_loss
 
         #print(loss, hm_loss, wh_loss, off_loss, id_loss)
