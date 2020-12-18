@@ -193,7 +193,7 @@ if __name__ == '__main__':
                       MOT16-10
                       MOT16-11
                       MOT16-13'''
-        data_root = os.path.join(opt.data_dir, 'MOT16/train')
+        data_root = os.path.join(opt.data_dir, 'MOT16/images/train')
     if opt.test_mot16:
         seqs_str = '''MOT16-01
                       MOT16-03
