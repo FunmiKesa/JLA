@@ -72,29 +72,12 @@ for seq in seqs:
     groups = df.groupby(['tid'])
     
     for tid, group in groups:
-        # print(group.head())
-        # group = group.sort_values('fid').reset_index(drop=True)
-        d = group.diff(periods=1)
-        d.dropna(inplace=True)
-        if d.empty:
-            continue
-        # check if frames are not consecutive
-        if len(d.fid.unique()) > 1:
-            # print(d.fid.unique())
-            # normalize the distance
-            # d = d / d.fid
-            d.fid = d.fid / d.fid
         fids = group.fid.unique()
-        assert len(fids) == d.shape[0] + 1 # we expect the first index to have been dropped
-        d['cord'] = d.apply(lambda  row: f"{row.x} {row.y} {row.w} {row.h}", axis=1)
         group['cord'] = group.apply(lambda  row: f"{row.x} {row.y} {row.w} {row.h} ", axis=1)
 
-        d = d[['fid', 'cord']]
-
-        # compute futures
-        for i, c in chunker1(d, future_length, 0):
+        for i, c in chunker1(group, future_length, 0):
             
-            v = c.reset_index().pivot(index='fid', columns=['index'], values='cord')
+            v = c.reset_index().pivot(index='tid', columns=['index'], values='cord')
             if v.empty:
                 continue
             label_str = f"{int(tid)} {' '.join(v.iloc[0])}\n"
@@ -105,12 +88,10 @@ for seq in seqs:
                 f.write(label_str)
     
         # compute past
-        d_reverse = d.iloc[::-1]
+        group_reverse = group.iloc[::-1]
         fids_reverse = fids[::-1]
-        d_reverse['cord'] = group.iloc[:0:-1]['cord'] + d_reverse['cord']
-        indices = d_reverse.index
-        for i, c in chunker1(d_reverse, past_length, 1):
-            v = c.reset_index().pivot(index='fid', columns=['index'], values='cord')
+        for i, c in chunker1(group_reverse, past_length, 1):
+            v = c.reset_index().pivot(index='tid', columns=['index'], values='cord')
             if v.empty:
                 continue
             label_str = f"{int(tid)} {' '.join(v.iloc[0][::-1])}\n"
@@ -118,7 +99,3 @@ for seq in seqs:
             label_fpath = osp.join(past_label_root, '{:06d}.txt'.format(fid))
             with open(label_fpath, 'a+') as f:
                 f.write(label_str)
-
-
-
-        # TODO: check if there are skipped frames
