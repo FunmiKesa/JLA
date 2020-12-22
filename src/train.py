@@ -50,7 +50,7 @@ def main(opt):
         dataset,
         batch_size=opt.batch_size,
         shuffle=True,
-        num_workers=1,#opt.num_workers,
+        num_workers=opt.num_workers,
         pin_memory=True,
         drop_last=True
     )
@@ -115,6 +115,6 @@ def main(opt):
 
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0, 1'
+    # os.environ['CUDA_VISIBLE_DEVICES'] = '0, 1'
     opt = opts().parse()
     main(opt)

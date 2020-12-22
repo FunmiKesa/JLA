@@ -556,8 +556,6 @@ class RNNForecast(nn.Module):
             self.emb_dim = self.heads['id']
             self.device = device
 
-            
-
     def forward(self, x):
         if self.forecast:
             prev = x[-1]

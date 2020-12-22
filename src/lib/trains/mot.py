@@ -47,7 +47,7 @@ class MotLoss(torch.nn.Module):
             # self.decoder = DecoderRNN(self.opt.device,input_size, output_size, hidden_size, 0, 1)
 
             self.FCTLoss = nn.MSELoss()
-            self.s_fct = nn.Parameter(-1.0 * torch.ones(1))
+            self.s_fct = nn.Parameter(-1.01 * torch.ones(1))
 
     def forward(self, outputs, batch):
         opt = self.opt
@@ -144,7 +144,7 @@ class MotLoss(torch.nn.Module):
                     pred_pasts = pred_pasts * pasts_mask.float()
                     pasts = pasts * pasts_mask.float()
 
-                    pasts = pasts.flip([1])
+                    # pasts = pasts.flip([1])
                     index = math.ceil(input_size / 2)
 
                     pasts[:, :, :, index:] = pasts[:, :, :, index:] * -1 # reverse direction
@@ -191,9 +191,7 @@ class MotLoss(torch.nn.Module):
         if self.opt.forecast:
             loss += torch.exp(-self.s_fct) * fct_loss + self.s_fct
         loss *= 0.5
-        print(self.s_det, torch.exp(-self.s_det) * det_loss, self.s_id, torch.exp(-self.s_id) * id_loss
-        # ,  self.s_fct, torch.exp(-self.s_fct) * fct_loss
-        )
+        # print(self.s_det, torch.exp(-self.s_det) * det_loss, self.s_id, torch.exp(-self.s_id) * id_loss, self.s_fct, torch.exp(-self.s_fct) * fct_loss)
         #loss = det_loss
 
         #print(loss, hm_loss, wh_loss, off_loss, id_loss)

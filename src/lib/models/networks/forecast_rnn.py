@@ -53,7 +53,7 @@ class DecoderRNN(nn.Module):
         if num_layers > 2:
             self.decoder3 = nn.GRUCell(self.num_hidden, self.num_hidden)
 
-    def forward(self, context, dla_features=None, future_length=5,  past_length=10, val=False):
+    def forward(self, context, dla_features=None, future_length=5,  past_length=10):
         outputs = []
         # h_t = torch.zeros(context.size(0), self.num_hidden, dtype=torch.float).to(self.device)
         h_t = context
@@ -67,7 +67,7 @@ class DecoderRNN(nn.Module):
         encoded_context = self.relu_context(encoded_context)
         # encoded_dla_features = self.relu_dla_features(encoded_dla_features)
         result = []
-        if not val:
+        if self.training:
             # generate input
             decoded_inputs = []
             h_t = context
