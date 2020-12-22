@@ -11,7 +11,7 @@ def mkdirs(d):
 
 def chunker1(seq, size, start_index):
     return ((pos,seq.iloc[pos+start_index
-    :pos + size - start_index]) for pos in range(0, len(seq)))
+    :pos + size + start_index]) for pos in range(0, len(seq)))
 
 seq_root = 'data/MOT/MOT20/images/train'
 label_root = 'data/MOT/MOT20/labels_with_ids/train'
@@ -80,7 +80,7 @@ for seq in seqs:
             continue
         # check if frames are not consecutive
         if len(d.fid.unique()) > 1:
-            print(d.fid.unique())
+            # print(d.fid.unique())
             # normalize the distance
             # d = d / d.fid
             d.fid = d.fid / d.fid
@@ -109,9 +109,8 @@ for seq in seqs:
         fids_reverse = fids[::-1]
         d_reverse['cord'] = group.iloc[:0:-1]['cord'] + d_reverse['cord']
         indices = d_reverse.index
-        for i, c in chunker1(d_reverse, past_length, 0):
+        for i, c in chunker1(d_reverse, past_length, 1):
             v = c.reset_index().pivot(index='fid', columns=['index'], values='cord')
-            idx = indices[i]
             if v.empty:
                 continue
             label_str = f"{int(tid)} {' '.join(v.iloc[0][::-1])}\n"
