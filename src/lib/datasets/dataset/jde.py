@@ -866,27 +866,52 @@ class JointDataset(LoadImagesAndLabels):  # for training
 
 
             ratio = min(float(self.height) / input_h, float(self.width) / input_w)
+            new_shape = (round(input_w * ratio), round(input_h * ratio))
+
+            dw = (self.width - new_shape[0]) / 2  # width padding
+            dh = (self.height - new_shape[1]) / 2  # height padding
             rw = ratio * input_w / self.width
             rh = ratio * input_h / self.height
+            output_h = new_shape[1] // self.opt.down_ratio
+            output_w = new_shape[0] // self.opt.down_ratio
+
 
             forecast_future_path = self.forecast_future_files[ds][files_index - start_index]
             if os.path.exists(forecast_future_path):
-                column_length = self.future_length * self.output_size +1
+                column_length = (self.future_length) * 4 + 1
                 forecasts, mask = load_txt(forecast_future_path, column_length, max_column=361)
                 inds = forecasts[:, 0]
                 forecasts = forecasts[:, 1:]
-                n = forecasts.shape[-1] // self.output_size
-                mask = mask[:, 1:].reshape(mask.shape[0],n, self.output_size)
+                n = forecasts.shape[-1] // 4
+                mask = mask[:, 1:].reshape(mask.shape[0],n, 4)#[:,1:,:]
                 futures_mask[:mask.shape[0], :] = mask
                 futures_inds[:mask.shape[0]] = inds
 
-                forecasts = forecasts.reshape(forecasts.shape[0], n, self.output_size)
+                forecasts = forecasts.reshape(forecasts.shape[0], n, 4)
 
-                bbox_xyxy = forecasts.copy()
-                bbox_xyxy[..., [0,2]] *= rw
-                bbox_xyxy[..., [1,3]] *= rh
+                labels = forecasts.copy()
+                labels[..., 0] = ratio * input_w * (forecasts[..., 0] - forecasts[..., 2] / 2) + dw
+                labels[..., 1] = ratio * input_h * (forecasts[..., 1] - forecasts[..., 3] / 2) + dh
+                labels[..., 2] = ratio * input_w * (forecasts[..., 0] + forecasts[..., 2] / 2) + dw
+                labels[..., 3] = ratio * input_h * (forecasts[..., 1] + forecasts[..., 3] / 2) + dh
 
-                futures[:bbox_xyxy.shape[0], ...] = bbox_xyxy
+                labels = xyxy2xywh(labels.copy())
+                labels[..., [0,2]] /= self.width
+                labels[..., [1,3]] /= self.height
+
+                labels[..., [0,2]] *= output_w
+                labels[..., [1,3]] *= output_h
+
+                # labels_change = np.diff(labels, axis=1)
+                # labels_change = labels.copy() # use the centroid and dimension instead of the change in centroid and velocity
+                
+                # bbox_xyxy = forecasts.copy()
+                # bbox_xyxy = np.diff(bbox_xyxy, axis=1)
+                # bbox_xyxy[..., [0,2]] *= rw 
+                # bbox_xyxy[..., [1,3]] *= rh
+
+                futures[:labels.shape[0], ...] = labels
+                futures = futures * futures_mask
 
             ret['futures'] = futures
             ret['futures_mask'] = futures_mask
@@ -895,22 +920,45 @@ class JointDataset(LoadImagesAndLabels):  # for training
 
             forecast_past_path = self.forecast_past_files[ds][files_index - start_index]
             if os.path.exists(forecast_past_path):
-                column_length = self.past_length * self.input_size + 1
-                forecasts, mask = load_txt(forecast_past_path, column_length, max_column=241)
+                column_length = (self.past_length + 1) * 4 + 1
+                forecasts, mask = load_txt(forecast_past_path, column_length, max_column=121)
                 inds = forecasts[:, 0]
                 forecasts = forecasts[:, 1:]
-                n = forecasts.shape[-1] // self.input_size
-                mask = mask[:, 1:].reshape(mask.shape[0], n, self.input_size)
-                pasts_mask[:mask.shape[0], :] = mask
+                n = forecasts.shape[-1] // 4
+                mask = mask[:, 1:].reshape(mask.shape[0], n, 4)[:,1:,:]
+                pasts_mask[:mask.shape[0], :, :4] = mask
+                pasts_mask[:mask.shape[0], :,  4:] = mask
                 pasts_inds[:mask.shape[0]] = inds
 
-                forecasts = forecasts.reshape(forecasts.shape[0], n, self.input_size)
-                bbox_xyxy = forecasts.copy()
+                forecasts = forecasts.reshape(forecasts.shape[0], n, 4)
 
-                bbox_xyxy[..., [0, 2, 4, 6]] *= rw
-                bbox_xyxy[..., [1, 3, 5, 7]] *= rh
+                labels = forecasts.copy()
+                labels[..., 0] = ratio * input_w * (forecasts[..., 0] - forecasts[..., 2] / 2) + dw
+                labels[..., 1] = ratio * input_h * (forecasts[..., 1] - forecasts[..., 3] / 2) + dh
+                labels[..., 2] = ratio * input_w * (forecasts[..., 0] + forecasts[..., 2] / 2) + dw
+                labels[..., 3] = ratio * input_h * (forecasts[..., 1] + forecasts[..., 3] / 2) + dh
 
-                pasts[:bbox_xyxy.shape[0], ...] = bbox_xyxy
+                labels = xyxy2xywh(labels.copy())
+                labels[..., [0,2]] /= self.width
+                labels[..., [1,3]] /= self.height
+
+                labels[..., [0,2]] *= output_w
+                labels[..., [1,3]] *= output_h
+
+                labels_change = np.diff(labels, axis=1) 
+                labels_change = labels_change *  -1
+
+                # bbox_xyxy = forecasts.copy()
+                # bbox_xyxy = np.diff(bbox_xyxy, axis=1)
+                # bbox_xyxy[..., [0,2]] *= rw 
+                # bbox_xyxy[..., [1,3]] *= rh
+
+                pasts[:labels_change.shape[0], :, 4:] = labels_change
+                pasts[:labels_change.shape[0], :, :4] = labels[:, :labels_change.shape[1], : ]
+
+                pasts = pasts * pasts_mask
+
+                
 
             # augment future labels
             ret['pasts'] = pasts
