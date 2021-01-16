@@ -98,6 +98,11 @@ class DecoderRNN(nn.Module):
         
         return result
 
+class Cumsum(nn.Module):
+    def forward(self, last, pred):
+        # cumsum
+        cs = last + torch.cumsum(pred, dim=1)
+        return cs
 class ForeCastRNN(nn.Module):
     def __init__(self, device, input_size, output_size, future_length, num_hidden, num_layers,  dropout=0):
         super(ForeCastRNN,self).__init__()
@@ -113,11 +118,16 @@ class ForeCastRNN(nn.Module):
         self.decoder = DecoderRNN(
                 self.device, input_size, output_size, self.num_hidden, self.dropout, self.num_layers)
 
-    def forward(self,prev_bboxes, features=None):
+        self.final = Cumsum()
+
+    def forward(self, prev_bboxes, features=None):
         context = self.encoder(prev_bboxes)
         past_length = prev_bboxes.shape[1]
         
         output= self.decoder(context, features, self.future_length, past_length=past_length)
+
+        last = prev_bboxes[:,:1,:4]
+        output[-1] = self.final(last, output[-1])
         
         return output
         

@@ -163,8 +163,8 @@ class opts(object):
                              help='not regress local offset.')
     self.parser.add_argument('--forecast', action='store_true',
                              help='not forecast bounding location')                     
-    self.parser.add_argument('--past_length', type=int, default=10, help='Number of previous frames to use in forecasting')
-    self.parser.add_argument('--future_length', type=int, default=5, help='Number of future frames forecast')
+    self.parser.add_argument('--past_length', type=int, default=15, help='Number of previous frames to use in forecasting')
+    self.parser.add_argument('--future_length', type=int, default=30, help='Number of future frames forecast')
     self.parser.add_argument('--hidden_size', type=int, default=512, help='Size of the RNN hidden layer')
 
   def parse(self, args=''):
