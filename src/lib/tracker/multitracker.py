@@ -40,7 +40,7 @@ class STrack(BaseTrack):
         self.features = deque([], maxlen=buffer_size)
         self.pasts = deque([], maxlen=15)
         self.alpha = 0.9
-        self.forecasts = None
+        self.forecasts = []
 
     def update_features(self, feat):
         feat /= np.linalg.norm(feat)
@@ -123,22 +123,16 @@ class STrack(BaseTrack):
         if update_feature:
             self.update_features(new_track.curr_feat)
     
-    # @property
-    # # @jit(nopython=True)
-    # def forecasts(self):
-    #     """Get forecasts using dcx, dcy, dw, dy"""
+    @property
+    # @jit(nopython=True)
+    def forecasts_xywh(self):
+        """Get forecasts using dcx, dcy, dw, dy"""
         
-    #     det = self.xywh
-    #     f = self._forecasts.copy().reshape(-1, 4)
-    #     f = np.cumsum(f, axis=1)
+        f = self.forecasts.copy().reshape(-1, 4)
+        f[:, 2:] -= f[:, :2]
+        f[:, :2] += f[:, 2:] / 2
 
-    #     f = det[np.newaxis, :] + f
-
-
-    #     # f[:, :2] -= f[:, 2:] / 2
-    #     # f[:, 2:] += f[:, :2]
-
-    #     return f
+        return f
 
     @property
     # @jit(nopython=True)
@@ -323,18 +317,18 @@ class JDETracker(object):
                 if len(bboxes) > 0:
                     bboxes = np.stack(bboxes, axis=0)
                     bbox = bboxes.copy()
-                    bbox[..., [0,2]] /= width
-                    bbox[..., [1,3]] /= height
+                    # bbox[..., [0,2]] /= width
+                    # bbox[..., [1,3]] /= height
                     labels = bbox.copy()
                     # labels[..., 0] = ratio * width * (bbox[..., 0] - bbox[..., 2] / 2) + dw
                     # labels[..., 1] = ratio * height * (bbox[..., 1] - bbox[..., 3] / 2) + dh
                     # labels[..., 2] = ratio * width * (bbox[..., 0] + bbox[..., 2] / 2) + dw
                     # labels[..., 3] = ratio * height * (bbox[..., 1] + bbox[..., 3] / 2) + dh
 
-                    labels[..., 0] = ratio * width * bbox[..., 0] + dw
-                    labels[..., 1] = ratio * height * bbox[..., 1]  + dh
-                    labels[..., 2] = ratio * width * bbox[..., 2]  + dw
-                    labels[..., 3] = ratio * height * bbox[..., 3] + dh
+                    labels[..., 0] = ratio * bbox[..., 0] + dw
+                    labels[..., 1] = ratio * bbox[..., 1]  + dh
+                    labels[..., 2] = ratio * bbox[..., 2]  + dw
+                    labels[..., 3] = ratio * bbox[..., 3] + dh
 
                     labels = xyxy2xywh(labels.copy())
                     labels[..., [0,2]] /= inp_width
@@ -553,7 +547,6 @@ class JDETracker(object):
                     c2 = c1[0] + t_size[0], c1[1] - t_size[1] - 3
                     cv2.rectangle(img, c1, c2, color, -1)
                     cv2.putText(img, label, (c1[0], c1[1] - 2), 0, tl / 3, (255, 255, 255), thickness=tf, lineType=cv2.LINE_AA)
-
 
                     for j in range(0, len(forecasts), 5):
                         bbox_pred = forecasts[j]

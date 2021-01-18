@@ -28,8 +28,6 @@ for seq in seqs:
     seq_width = int(seq_info[seq_info.find('imWidth=') + 8:seq_info.find('\nimHeight')])
     seq_height = int(seq_info[seq_info.find('imHeight=') + 9:seq_info.find('\nimExt')])
 
-    gt_txt = osp.join(seq_root, seq, 'gt', 'gt.txt')
-    gt = np.loadtxt(gt_txt, dtype=np.float64, delimiter=',')
     seq_label_root = osp.join(label_root, seq, 'img1')
     future_label_root = osp.join(label_root, seq, 'future')
     past_label_root = osp.join(label_root, seq, 'past')
@@ -51,9 +49,12 @@ for seq in seqs:
     bboxes = []
     for filename in sorted(glob.glob(seq_label_root +"/*.txt")):
         fid = int(filename.split('/')[-1].replace('.txt', ''))
-        bbox = np.loadtxt(filename)
+        bbox = np.loadtxt(filename, dtype=np.float64)
         if len(bbox.shape) == 1: 
             bbox = bbox.reshape(1, bbox.shape[0])
+        # convert the original size
+        bbox[:, [2,4]] *= seq_width
+        bbox[:, [3,5]] *= seq_height
         bbox[:, 0] = fid
         bboxes += [bbox]
 
@@ -73,10 +74,9 @@ for seq in seqs:
     
     for tid, group in groups:
         fids = group.fid.unique()
-        group['cord'] = group.apply(lambda  row: f"{row.x} {row.y} {row.w} {row.h} ", axis=1)
+        group['cord'] = group.apply(lambda  row: f"{row.x} {row.y} {row.w} {row.h}", axis=1)
 
         for i, c in chunker1(group, future_length, 0):
-            
             v = c.reset_index().pivot(index='tid', columns=['index'], values='cord')
             if v.empty:
                 continue
