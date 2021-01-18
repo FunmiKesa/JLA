@@ -50,7 +50,8 @@ def write_results(filename, results, data_type):
                     continue
                 x1, y1, w, h = tlwh
                 x2, y2 = x1 + w, y1 + h
-                line = save_format.format(frame=frame_id, id=track_id, x1=x1, y1=y1, x2=x2, y2=y2, w=w, h=h)
+                line = save_format.format(
+                    frame=frame_id, id=track_id, x1=x1, y1=y1, x2=x2, y2=y2, w=w, h=h)
                 f.write(line)
     logger.info('save results to {}'.format(filename))
 
@@ -72,7 +73,8 @@ def write_results_score(filename, results, data_type):
                     continue
                 x1, y1, w, h = tlwh
                 x2, y2 = x1 + w, y1 + h
-                line = save_format.format(frame=frame_id, id=track_id, x1=x1, y1=y1, x2=x2, y2=y2, w=w, h=h, s=score)
+                line = save_format.format(
+                    frame=frame_id, id=track_id, x1=x1, y1=y1, x2=x2, y2=y2, w=w, h=h, s=score)
                 f.write(line)
     logger.info('save results to {}'.format(filename))
 
@@ -86,12 +88,13 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
     frame_id = 0
     forecast_results = []
 
-    #for path, img, img0 in dataloader:
+    # for path, img, img0 in dataloader:
     for i, (path, img, img0) in enumerate(dataloader):
-        #if i % 8 != 0:
-            #continue
+        # if i % 8 != 0:
+        # continue
         if frame_id % 20 == 0:
-            logger.info('Processing frame {} ({:.2f} fps)'.format(frame_id, 1. / max(1e-5, timer.average_time)))
+            logger.info('Processing frame {} ({:.2f} fps)'.format(
+                frame_id, 1. / max(1e-5, timer.average_time)))
 
         # run tracking
         timer.tic()
@@ -108,9 +111,10 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
             if tlwh[2] * tlwh[3] > opt.min_box_area and not vertical:
                 online_tlwhs.append(tlwh)
                 online_ids.append(tid)
-                #online_scores.append(t.score)
+                # online_scores.append(t.score)
                 if len(t.forecasts):
-                    online_forecasts.append(np.array([tid] + list(t.forecasts_xywh.reshape(-1))))
+                    online_forecasts.append(
+                        np.array([tid] + list(t.forecasts_xywh.reshape(-1))))
         timer.toc()
         # save results
         results.append((frame_id + 1, online_tlwhs, online_ids))
@@ -123,7 +127,8 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
         if show_image:
             cv2.imshow('online_im', online_im)
         if save_dir is not None:
-            cv2.imwrite(os.path.join(save_dir, '{:05d}.jpg'.format(frame_id)), online_im)
+            cv2.imwrite(os.path.join(
+                save_dir, '{:05d}.jpg'.format(frame_id)), online_im)
         frame_id += 1
     # save results
     write_results(result_filename, results, data_type)
@@ -144,15 +149,24 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
     accs = []
     n_frame = 0
     timer_avgs, timer_calls = [], []
+    if opt.forecast:
+        aious = []
+        fious = []
+        ades = []
+        fdes = []
     for i, seq in enumerate(seqs):
-        output_dir = os.path.join(data_root, '..', 'outputs', exp_name, seq) if save_images or save_videos else None
-        forecast_dir = os.path.join(data_root, '..', 'forecasts', exp_name, seq) if opt.forecast else None
+        output_dir = os.path.join(
+            data_root, '..', 'outputs', exp_name, seq) if save_images or save_videos else None
+        forecast_dir = os.path.join(
+            opt.forecast_root, seq, 'pred') if opt.forecast else None
         opt.forecast_dir = forecast_dir
         logger.info('start seq: {}'.format(seq))
-        dataloader = datasets.LoadImages(osp.join(data_root, seq, 'img1'), opt.img_size)
+        dataloader = datasets.LoadImages(
+            osp.join(data_root, seq, 'img1'), opt.img_size)
         result_filename = os.path.join(result_root, '{}.txt'.format(seq))
         meta_info = open(os.path.join(data_root, seq, 'seqinfo.ini')).read()
-        frame_rate = int(meta_info[meta_info.find('frameRate') + 10:meta_info.find('\nseqLength')])
+        frame_rate = int(meta_info[meta_info.find(
+            'frameRate') + 10:meta_info.find('\nseqLength')])
         nf, ta, tc = eval_seq(opt, dataloader, data_type, result_filename,
                               save_dir=output_dir, show_image=show_image, frame_rate=frame_rate)
         n_frame += nf
@@ -165,23 +179,47 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
         accs.append(evaluator.eval_file(result_filename))
         summary = Evaluator.get_summary(accs, seqs[:i+1], metrics)
         strsummary = mm.io.render_summary(
-        summary,
-        formatters=mh.formatters,
-        namemap=mm.io.motchallenge_metric_names
-    )
+            summary,
+            formatters=mh.formatters,
+            namemap=mm.io.motchallenge_metric_names
+        )
         print(strsummary)
+
+        # evaluate forecast results
+        if opt.forecast:
+            logger.info('Evaluate seq (forecast): {}'.format(seq))
+            future_label_root = osp.join(opt.forecast_root, seq, 'future')
+
+            from forecast_utils import evaluation
+            aiou, fiou, ade, fde = evaluation.eval_seq(future_label_root)
+            aious.append(aiou)
+            fious.append(fiou)
+            ades.append(ade)
+            fdes.append(fde)
+
+            print()
+            print(seq)
+            print('AIOU: ', round(aiou * 100, 1))
+            print('FIOU: ', round(fiou * 100, 1))
+            print('ADE:  ', round(ade, 1))
+            print('FDE:  ', round(fde, 1))
+
+
         if save_videos:
             output_video_path = osp.join(output_dir, '{}.mp4'.format(seq))
-            cmd_str = 'ffmpeg -f image2 -i {}/%05d.jpg -c:v copy {}'.format(output_dir, output_video_path)
+            cmd_str = 'ffmpeg -f image2 -i {}/%05d.jpg -c:v copy {}'.format(
+                output_dir, output_video_path)
             os.system(cmd_str)
+            
     timer_avgs = np.asarray(timer_avgs)
     timer_calls = np.asarray(timer_calls)
     all_time = np.dot(timer_avgs, timer_calls)
     avg_time = all_time / np.sum(timer_calls)
-    logger.info('Time elapsed: {:.2f} seconds, FPS: {:.2f}'.format(all_time, 1.0 / avg_time))
+    logger.info('Time elapsed: {:.2f} seconds, FPS: {:.2f}'.format(
+        all_time, 1.0 / avg_time))
 
     # get summary
-    
+
     summary = Evaluator.get_summary(accs, seqs, metrics)
     strsummary = mm.io.render_summary(
         summary,
@@ -189,14 +227,24 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
         namemap=mm.io.motchallenge_metric_names
     )
     print(strsummary)
-    Evaluator.save_summary(summary, os.path.join(result_root, 'summary_{}.xlsx'.format(exp_name)))
+    Evaluator.save_summary(summary, os.path.join(
+        result_root, 'summary_{}.xlsx'.format(exp_name)))
 
+    if opt.forecast:
+        aiou = round(np.mean(aious) * 100, 1)
+        fiou = round(np.mean(fious) * 100, 1)
+        ade = round(np.mean(ades), 1)
+        fde = round(np.mean(fdes), 1)
+
+        print('Mean')
+        print('AIOU: ', aiou)
+        print('FIOU: ', fiou)
+        print('ADE:  ', ade)
+        print('FDE:  ', fde)
 
 if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = '2,3'
     opt = opts().init()
-
-
 
     if not opt.val_mot16:
         seqs_str = '''KITTI-13
@@ -248,11 +296,11 @@ if __name__ == '__main__':
                       MOT17-08-SDP
                       MOT17-12-SDP
                       MOT17-14-SDP'''
-        #seqs_str = '''MOT17-01-SDP
-                      #MOT17-06-SDP
-                      #MOT17-07-SDP
-                      #MOT17-12-SDP
-                      #'''
+        # seqs_str = '''MOT17-01-SDP
+        # MOT17-06-SDP
+        # MOT17-07-SDP
+        # MOT17-12-SDP
+        # '''
         #seqs_str = '''MOT17-01-SDP MOT17-07-SDP MOT17-12-SDP MOT17-14-SDP'''
         #seqs_str = '''MOT17-03-SDP'''
         #seqs_str = '''MOT17-06-SDP MOT17-08-SDP'''
@@ -298,6 +346,8 @@ if __name__ == '__main__':
         data_root = os.path.join(opt.data_dir, 'MOT20/images/test')
     seqs = [seq.strip() for seq in seqs_str.split()]
 
+    if opt.forecast:
+        opt.forecast_root = data_root.replace('images', 'labels_with_ids')
     main(opt,
          data_root=data_root,
          seqs=seqs,
