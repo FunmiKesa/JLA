@@ -23,6 +23,16 @@ from tracking_utils.utils import mkdir_if_missing
 from opts import opts
 
 
+def write_results_forecasts(dir, results):
+    mkdir_if_missing(dir)
+    for frame_id, forecasts in results:
+        filename = os.path.join(dir, '{:06d}.txt'.format(frame_id))
+        forecasts = np.array(forecasts)
+        fmt = fmt = '%d '+'%f ' * (forecasts.shape[-1] - 1)
+        np.savetxt(filename, forecasts, fmt=fmt)
+    logger.info('save forecast results to {}'.format(dir))
+
+
 def write_results(filename, results, data_type):
     if data_type == 'mot':
         save_format = '{frame},{id},{x1},{y1},{w},{h},1,-1,-1,-1\n'
@@ -74,6 +84,8 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
     timer = Timer()
     results = []
     frame_id = 0
+    forecast_results = []
+
     #for path, img, img0 in dataloader:
     for i, (path, img, img0) in enumerate(dataloader):
         #if i % 8 != 0:
@@ -88,6 +100,7 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
         online_tlwhs = []
         online_ids = []
         #online_scores = []
+        online_forecasts = []
         for t in online_targets:
             tlwh = t.tlwh
             tid = t.track_id
@@ -96,9 +109,13 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
                 online_tlwhs.append(tlwh)
                 online_ids.append(tid)
                 #online_scores.append(t.score)
+                if len(t.forecasts):
+                    online_forecasts.append(np.array([tid] + list(t.forecasts_xywh.reshape(-1))))
         timer.toc()
         # save results
         results.append((frame_id + 1, online_tlwhs, online_ids))
+        if len(online_forecasts):
+            forecast_results.append((frame_id + 1, online_forecasts))
         #results.append((frame_id + 1, online_tlwhs, online_ids, online_scores))
         if show_image or save_dir is not None:
             online_im = vis.plot_tracking(img0, online_tlwhs, online_ids, frame_id=frame_id,
@@ -110,6 +127,7 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
         frame_id += 1
     # save results
     write_results(result_filename, results, data_type)
+    write_results_forecasts(opt.forecast_dir, forecast_results)
     #write_results_score(result_filename, results, data_type)
     return frame_id, timer.average_time, timer.calls
 
@@ -128,6 +146,8 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
     timer_avgs, timer_calls = [], []
     for i, seq in enumerate(seqs):
         output_dir = os.path.join(data_root, '..', 'outputs', exp_name, seq) if save_images or save_videos else None
+        forecast_dir = os.path.join(data_root, '..', 'forecasts', exp_name, seq) if opt.forecast else None
+        opt.forecast_dir = forecast_dir
         logger.info('start seq: {}'.format(seq))
         dataloader = datasets.LoadImages(osp.join(data_root, seq, 'img1'), opt.img_size)
         result_filename = os.path.join(result_root, '{}.txt'.format(seq))
@@ -173,8 +193,10 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
 
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '2,3'
     opt = opts().init()
+
+
 
     if not opt.val_mot16:
         seqs_str = '''KITTI-13
