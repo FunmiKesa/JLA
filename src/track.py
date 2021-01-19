@@ -199,18 +199,22 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
 
             print()
             print(seq)
-            print('AIOU: ', round(aiou * 100, 1))
-            print('FIOU: ', round(fiou * 100, 1))
+            print('AIOU: ', round(aiou, 1))
+            print('FIOU: ', round(fiou, 1))
             print('ADE:  ', round(ade, 1))
             print('FDE:  ', round(fde, 1))
 
+            filename = os.path.join(
+            result_root, 'forecast_{}.csv'.format(exp_name))
+
+            evaluation.save_result(filename, [aious, fious, ades, fdes], seqs[:i+1], ["aiou", "fiou", "ade", "fde"])
 
         if save_videos:
             output_video_path = osp.join(output_dir, '{}.mp4'.format(seq))
             cmd_str = 'ffmpeg -f image2 -i {}/%05d.jpg -c:v copy {}'.format(
                 output_dir, output_video_path)
             os.system(cmd_str)
-            
+
     timer_avgs = np.asarray(timer_avgs)
     timer_calls = np.asarray(timer_calls)
     all_time = np.dot(timer_avgs, timer_calls)
@@ -227,12 +231,14 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
         namemap=mm.io.motchallenge_metric_names
     )
     print(strsummary)
-    Evaluator.save_summary(summary, os.path.join(
-        result_root, 'summary_{}.xlsx'.format(exp_name)))
+    # Evaluator.save_summary(summary, os.path.join(
+        # result_root, 'summary_{}.xlsx'.format(exp_name)))
+    summary.to_csv(os.path.join(
+        result_root, 'summary_{}.csv'.format(exp_name)))
 
     if opt.forecast:
-        aiou = round(np.mean(aious) * 100, 1)
-        fiou = round(np.mean(fious) * 100, 1)
+        aiou = round(np.mean(aious), 1)
+        fiou = round(np.mean(fious), 1)
         ade = round(np.mean(ades), 1)
         fde = round(np.mean(fdes), 1)
 
@@ -241,6 +247,12 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
         print('FIOU: ', fiou)
         print('ADE:  ', ade)
         print('FDE:  ', fde)
+
+        filename = os.path.join(
+            result_root, 'forecast_{}.csv'.format(exp_name))
+
+        evaluation.save_result(filename, [aious, fious, ades, fdes], seqs, ["aiou", "fiou", "ade", "fde"])
+
 
 if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = '2,3'

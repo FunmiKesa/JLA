@@ -17,12 +17,12 @@ import motmetrics as mm
 mm.lap.default_solver = 'lap'
 
 
-def eval_seq(future_label_root, pred_length=30):
+def eval_seq(label_root, pred_length=30, gt_folder='future', pred_folder='pred'):
     future_bboxes = []
     pred_bboxes = []
-    for filename in sorted(glob.glob(future_label_root + "/*.txt")):
+    for filename in sorted(glob.glob(label_root + "/*.txt")):
         # check if file exist in pred folder
-        pred_filename = filename.replace('future', 'pred')
+        pred_filename = filename.replace(gt_folder, pred_folder)
         if not osp.exists(pred_filename):
             continue
 
@@ -30,17 +30,15 @@ def eval_seq(future_label_root, pred_length=30):
         mask = mask[:, 1:].reshape(mask.shape[0], -1, 4)
         future_bbox = bbox[:, 1:].reshape(bbox.shape[0], pred_length, -1)
 
-        bbox = np.loadtxt(pred_filename, dtype=np.float64)
-        if len(bbox.shape) == 1:
-            bbox = bbox.reshape(1, bbox.shape[0])
+        bbox, _ = load_txt(pred_filename, column_length=pred_length*4+1)
         pred_bbox = bbox[:, 1:].reshape(bbox.shape[0], pred_length, -1)
 
+        f, p = future_bbox[:, 0, :], pred_bbox[:, 0, :]
+        
         # get distance matrix
-        dists = mm.distances.iou_matrix(
-            future_bbox[:, 0, :], pred_bbox[:, 0, :], max_iou=0.5)
+        dists = mm.distances.iou_matrix(f, p, max_iou=0.5)
 
         valid_i, valid_j = np.where(np.isfinite(dists))
-        valid_dists = dists[valid_i, valid_j]
 
         future_bbox = future_bbox[valid_i]
         mask = mask[valid_i]
@@ -54,13 +52,13 @@ def eval_seq(future_label_root, pred_length=30):
 
     ade = calc_ade(future_bboxes, pred_bboxes)
     fde = calc_fde(future_bboxes, pred_bboxes)
-    aiou = calc_aiou(future_bboxes, pred_bboxes)
-    fiou = calc_fiou(future_bboxes, pred_bboxes)
+    aiou = calc_aiou(future_bboxes, pred_bboxes) * 100
+    fiou = calc_fiou(future_bboxes, pred_bboxes) * 100
 
     return aiou, fiou, ade, fde
 
 
-def eval(label_root):
+def eval(label_root, pred_length=30, gt_folder='future', pred_folder='pred'):
     seqs = [s for s in os.listdir(label_root)]
 
     aious = []
@@ -69,9 +67,9 @@ def eval(label_root):
     fdes = []
 
     for seq in seqs:
-        future_label_root = osp.join(label_root, seq, 'future')
+        seq_label_root = osp.join(label_root, seq, gt_folder)
 
-        aiou, fiou, ade, fde = eval_seq(future_label_root)
+        aiou, fiou, ade, fde = eval_seq(seq_label_root, pred_length, gt_folder, pred_folder)
 
         aious.append(aiou)
         fious.append(fiou)
@@ -80,14 +78,14 @@ def eval(label_root):
 
         print()
         print(seq)
-        print('AIOU: ', round(aiou * 100, 1))
-        print('FIOU: ', round(fiou * 100, 1))
+        print('AIOU: ', round(aiou, 1))
+        print('FIOU: ', round(fiou, 1))
         print('ADE:  ', round(ade, 1))
         print('FDE:  ', round(fde, 1))
 
     print()
-    aiou = round(np.mean(aious) * 100, 1)
-    fiou = round(np.mean(fious) * 100, 1)
+    aiou = round(np.mean(aious), 1)
+    fiou = round(np.mean(fious), 1)
     ade = round(np.mean(ades), 1)
     fde = round(np.mean(fdes), 1)
 
@@ -99,7 +97,16 @@ def eval(label_root):
 
     return aiou, fiou, ade, fde
 
+def save_result(filename, result, index, columns):
+    result = np.array(result).T
+    df = pd.DataFrame(result, index=index, columns=columns)
+    df.loc['Mean'] = df.mean()
+    df.to_csv(filename)
 
-if __name__ == "__main__":
-    label_root = '/media2/funmi/MOT/MOT16/labels_with_ids/train'
-    eval(label_root)
+# def save_result(filename, result, index, columns):
+#     import pandas as pd
+#     df = pd.DataFrame(result, index=index, columns=columns)
+#     df['Mean'] = df.mean(axis=1)
+#     writer = pd.ExcelWriter(filename)
+#     df.to_excel(writer)
+#     writer.save()
