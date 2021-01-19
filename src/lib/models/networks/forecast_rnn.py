@@ -38,14 +38,14 @@ class DecoderRNN(nn.Module):
         self.output_size = output_size
         self.device = device
         self.decoder1 = nn.GRUCell(int(self.num_hidden/2), self.num_hidden)
-        self.decoder2 = nn.GRUCell(self.num_hidden//2, self.num_hidden)
+        self.decoder2 = nn.GRUCell(self.num_hidden, self.num_hidden)
         self.fc_in = nn.Linear(self.num_hidden, self.input_size)
         self.fc_out = nn.Linear(self.num_hidden, self.output_size)
         # self.dropout_context = nn.Dropout(p=dropout_p)
         # self.dropout_dla_features = nn.Dropout(p=dropout_p)
         self.relu_context = nn.ReLU()
         self.relu_output = nn.ReLU()
-        # self.relu_dla_features = nn.ReLU()
+        self.relu_dla_features = nn.ReLU()
         self.context_encoder = nn.Linear(self.num_hidden, int(self.num_hidden / 2))
         # self.dla_encoder = nn.Linear(256, int(self.num_hidden / 2))
         if num_layers > 1:
@@ -55,17 +55,16 @@ class DecoderRNN(nn.Module):
 
     def forward(self, context, dla_features=None, future_length=5,  past_length=10):
         outputs = []
-        # h_t = torch.zeros(context.size(0), self.num_hidden, dtype=torch.float).to(self.device)
         h_t = context
         # Fully connected
         encoded_context = self.context_encoder(context)
-        # encoded_dla_features = self.dla_encoder(dla_features)
+        encoded_dla_features = self.dla_encoder(dla_features)
         # Dropout
         # encoded_context = self.dropout_context(encoded_context)
         # encoded_dla_features = self.dropout_dla_features(encoded_dla_features)
         # Relu
         encoded_context = self.relu_context(encoded_context)
-        # encoded_dla_features = self.relu_dla_features(encoded_dla_features)
+        encoded_dla_features = self.relu_dla_features(encoded_dla_features)
         result = []
         if self.training:
             # generate input
@@ -79,7 +78,7 @@ class DecoderRNN(nn.Module):
             decoded_inputs = torch.stack(decoded_inputs, 1)
             result.append(decoded_inputs)
 
-        # encoded_context = torch.cat((encoded_context, dla_features), 1)
+        encoded_context = torch.cat((encoded_context, dla_features), 1)
         
         h_t = context
 

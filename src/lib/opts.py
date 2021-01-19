@@ -162,7 +162,9 @@ class opts(object):
     self.parser.add_argument('--not_reg_offset', action='store_true',
                              help='not regress local offset.')
     self.parser.add_argument('--forecast', action='store_true',
-                             help='not forecast bounding location')                     
+                             help='forecast bounding location')     
+    self.parser.add_argument('--use_embedding', action='store_true',
+                             help='use image embedding in forecast training and inference')                 
     self.parser.add_argument('--past_length', type=int, default=15, help='Number of previous frames to use in forecasting')
     self.parser.add_argument('--future_length', type=int, default=30, help='Number of future frames forecast')
     self.parser.add_argument('--hidden_size', type=int, default=512, help='Size of the RNN hidden layer')
@@ -247,8 +249,8 @@ class opts(object):
       opt.img_size = (1088, 608)
       #opt.img_size = (864, 480)
       #opt.img_size = (576, 320)
-      # if opt.forecast:
-      #   opt.heads.update({'fct': 256})
+      if opt.forecast and opt.use_embedding:
+        opt.heads.update({'fct': 256})
     else:
       assert 0, 'task not defined!'
     print('heads', opt.heads)
