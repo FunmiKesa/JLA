@@ -38,7 +38,7 @@ class DecoderRNN(nn.Module):
         self.output_size = output_size
         self.device = device
         self.decoder1 = nn.GRUCell(int(self.num_hidden/2), self.num_hidden)
-        self.decoder2 = nn.GRUCell(self.num_hidden, self.num_hidden)
+        self.decoder2 = nn.GRUCell(self.num_hidden//2, self.num_hidden)
         self.fc_in = nn.Linear(self.num_hidden, self.input_size)
         self.fc_out = nn.Linear(self.num_hidden, self.output_size)
         # self.dropout_context = nn.Dropout(p=dropout_p)
