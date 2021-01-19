@@ -189,7 +189,7 @@ def load_txt(filepath, column_length, max_column=400):
         data = data[columns]
     data = data.values
     
-    mask = (~ np.isnan(data)).astype(np.int)
+    mask = (~np.isnan(data)).astype(np.int)
 
     # change nan values to 0
     data = np.nan_to_num(data)

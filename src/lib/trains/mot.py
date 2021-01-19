@@ -146,8 +146,8 @@ class MotLoss(torch.nn.Module):
                     pasts = pasts * pasts_mask
 
                     # pasts = pasts.flip([1])
-                    index = math.ceil(input_size / 2)
-                    pasts[..., index:] = pasts[..., index:] * -1
+                    # index = math.ceil(input_size / 2)
+                    # pasts[..., index:] = pasts[..., index:] * -1
 
                     # print(pasts_mask.sum([0,1]).max())
 

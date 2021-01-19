@@ -620,18 +620,23 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 labels[..., [0, 2]] *= output_w
                 labels[..., [1, 3]] *= output_h
 
+                # flip - oldest first
+                labels = np.flip(labels, 1)
+                # labels_change = np.flip(labels_change, 1)
+                pasts_mask = np.flip(pasts_mask, 1)
+ 
                 labels_change = np.diff(labels, axis=1)
-                labels_change = labels_change * -1
+                labels = labels[:, 1:, :]
 
+                
                 pasts[:labels_change.shape[0], :, 4:] = labels_change
-                pasts[:labels_change.shape[0], :,
-                      :4] = labels[:, :labels_change.shape[1], :]
+                pasts[:labels_change.shape[0], :, :4] = labels
 
                 pasts = pasts * pasts_mask
 
             # augment future labels
-            ret['pasts'] = pasts
-            ret['pasts_mask'] = pasts_mask
+            ret['pasts'] = pasts.astype(np.float32)
+            ret['pasts_mask'] = pasts_mask.astype(np.uint8)
             ret['pasts_inds'] = pasts_inds
 
         return ret
