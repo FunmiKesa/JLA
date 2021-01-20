@@ -1,8 +1,8 @@
 .idea
-.fairmot
 *.pyc
 __pycache__
 data/**
 *.jpg
 data/
 exp/
+exp/**

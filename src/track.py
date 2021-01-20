@@ -226,13 +226,13 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
 
     # get summary
 
-    summary = Evaluator.get_summary(accs, seqs, metrics)
-    strsummary = mm.io.render_summary(
-        summary,
-        formatters=mh.formatters,
-        namemap=mm.io.motchallenge_metric_names
-    )
-    print(strsummary)
+    # summary = Evaluator.get_summary(accs, seqs, metrics)
+    # strsummary = mm.io.render_summary(
+    #     summary,
+    #     formatters=mh.formatters,
+    #     namemap=mm.io.motchallenge_metric_names
+    # )
+    # print(strsummary)
     # Evaluator.save_summary(summary, os.path.join(
         # result_root, 'summary_{}.xlsx'.format(exp_name)))
     summary.to_csv(os.path.join(
@@ -250,10 +250,10 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
         print('ADE:  ', ade)
         print('FDE:  ', fde)
 
-        filename = os.path.join(
-            result_root, 'forecast_{}.csv'.format(exp_name))
+        # filename = os.path.join(
+            # result_root, 'forecast_{}.csv'.format(exp_name))
 
-        evaluation.save_result(filename, [aious, fious, ades, fdes], seqs, ["aiou", "fiou", "ade", "fde"])
+        # evaluation.save_result(filename, [aious, fious, ades, fdes], seqs, ["aiou", "fiou", "ade", "fde"])
 
 
 if __name__ == '__main__':

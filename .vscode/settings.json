@@ -1,0 +1,7 @@
+{
+    "python.pythonPath": "/home/funmi/anaconda3/envs/FairMOT/bin/python",
+    "python.analysis.extraPaths": [
+        "src",
+        "src/lib"
+    ]
+}

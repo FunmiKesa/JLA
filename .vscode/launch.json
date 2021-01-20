@@ -1,0 +1,90 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Train: mot20_dla34_forecast",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "/home/funmi/Experiments/FairMOT/src",
+            "args": [
+                "mot",
+                "--exp_id", "rnnforecast_34_16_debug",
+                "--load_model", "../models/ctdet_coco_dla_2x.pth",
+                "--data_cfg", "../src/lib/cfg/mot_sample.json",
+                "--batch_size", "1",
+                "--gpus", "0",
+                "--forecast", "--num_epochs", "1600",
+                "--arch", "rnnforecast_34",
+                "--trainval",
+                // "--resume",
+            ]
+        },
+        {
+            "name": "Demo",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            // "cwd": "/home/funmi/Experiments/FairMOT/src",
+
+            "args": [
+                "mot",
+                "--load_model",
+                "models/fairmot_dla34.pth",
+                "--conf_thres",
+                "0.4",
+                "--input-video",
+                "videos/MOT17-09-SDP-raw.webm",
+                "--output-root",
+                "demos"
+            ]
+        },
+        {
+            "name": "Track",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "/home/funmi/Experiments/FairMOT/src",
+            "env": {"CUDA_VISIBLE_DEVICES":"2"},
+            "args": [
+                "mot",
+                "--load_model", "/home/funmi/Experiments/FairMOT/exp/mot/rnnforecast_34_16_debug/model_278.pth",
+                "--conf_thres", "0.6",
+                "--val_mot16",
+                "--batch_size", "6",
+                "--gpu","2",
+                "--forecast",
+                "--exp_id", "rnnforecast_34_16_debug",
+                "--arch", "rnnforecast_34",
+            ]
+        }, 
+        {
+            "name": "Test emb",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "/home/funmi/Experiments/FairMOT/src",
+            "args": [
+                "mot",
+                "--load_model",
+                "/home/funmi/Experiments/FairMOT/exp/mot/mot17_dla34/model_20.pth",
+                "--conf_thres",
+                "0.6",
+                "--val_mot15",
+                "--batch_size",
+                "4",
+                // "--gpu",
+                // "2,3",
+                // "--forecast",
+            ]
+        },
+    ]
+}
+

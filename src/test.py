@@ -6,4 +6,6 @@ import _init_paths
 from forecast_utils.evaluation import *
 if __name__ == "__main__":
     label_root = '/media2/funmi/MOT/MOT16/labels_with_ids/train'
-    eval(label_root, pred_folder='cv_15', pred_length=30)
+
+    filename = '/media2/funmi/MOT/MOT16/images/results/forecasts_cv_15.csv'
+    eval(label_root, pred_folder='cv_15', pred_length=30, filename=filename)
