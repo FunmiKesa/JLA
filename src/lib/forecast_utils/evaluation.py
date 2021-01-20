@@ -94,14 +94,14 @@ def eval_seq(label_root, pred_length=30, gt_folder='future', pred_folder='pred')
     return aiou, fiou, ade, fde
 
 
-def eval(label_root, pred_length=30, gt_folder='future', pred_folder='pred'):
+def eval(label_root, pred_length=30, gt_folder='future', pred_folder='pred', filename=None):
     seqs = [s for s in os.listdir(label_root)]
 
     aious = []
     fious = []
     ades = []
     fdes = []
-
+    i=0
     for seq in seqs:
         seq_label_root = osp.join(label_root, seq)
 
@@ -118,6 +118,10 @@ def eval(label_root, pred_length=30, gt_folder='future', pred_folder='pred'):
         print('FIOU: ', round(fiou, 1))
         print('ADE:  ', round(ade, 1))
         print('FDE:  ', round(fde, 1))
+       
+        if filename:
+            save_result(filename, [aious, fious, ades, fdes], seqs[:i+1], ["aiou", "fiou", "ade", "fde"])
+        i += 1
 
     print()
     aiou = round(np.mean(aious), 1)
@@ -131,7 +135,10 @@ def eval(label_root, pred_length=30, gt_folder='future', pred_folder='pred'):
     print('ADE:  ', ade)
     print('FDE:  ', fde)
 
-    return aiou, fiou, ade, fde
+    # if filename:
+    #     save_result(filename, [aious, fious, ades, fdes], seqs, ["aiou", "fiou", "ade", "fde"])
+
+    return aious, fious, ades, fdes
 
 def save_result(filename, result, index, columns):
     result = np.array(result).T
