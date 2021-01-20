@@ -1,5 +1,5 @@
 {
-    "root":"/data/yfzhang/MOT/JDE",
+    "root":"../data/MOT",
     "train":
     {
         "crowdhuman_train":"./data/crowdhuman.train",
