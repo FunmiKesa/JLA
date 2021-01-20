@@ -627,7 +627,6 @@ class JointDataset(LoadImagesAndLabels):  # for training
  
                 labels_change = np.diff(labels, axis=1)
                 labels = labels[:, 1:, :]
-
                 
                 pasts[:labels_change.shape[0], :, 4:] = labels_change
                 pasts[:labels_change.shape[0], :, :4] = labels

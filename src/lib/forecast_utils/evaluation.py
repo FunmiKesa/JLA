@@ -51,13 +51,20 @@ def eval_seq(label_root, pred_length=30, gt_folder='future', pred_folder='pred')
         # get distance matrix
         dists = mm.distances.iou_matrix(b1, b2, max_iou=0.5)
 
-        valid_i, valid_j = np.where(np.isfinite(dists))
+        # match_is, match_js = np.where(np.isfinite(dists))
+        match_is, match_js = mm.lap.linear_sum_assignment(dists)
+        match_is, match_js = map(lambda a: np.asarray(a, dtype=int), [match_is, match_js])
+        match_ious = dists[match_is, match_js]
 
-        bbox1 = bbox1[valid_i]
-        mask1 = mask1[valid_i]
+        match_js = np.asarray(match_js, dtype=int)
+        match_js = match_js[np.logical_not(np.isnan(match_ious))]
+        match_is = match_is[np.logical_not(np.isnan(match_ious))]
 
-        bbox2 = bbox2[valid_j]
-        mask2 = mask2[valid_j]
+        bbox1 = bbox1[match_is]
+        mask1 = mask1[match_is]
+
+        bbox2 = bbox2[match_js]
+        mask2 = mask2[match_js]
 
         mask = mask1 & mask2
         bbox1 *= mask
@@ -78,7 +85,7 @@ def eval_seq(label_root, pred_length=30, gt_folder='future', pred_folder='pred')
 
     aiou, fiou, ade, fde = 0, 0, 0, 0 
 
-    if len(bboxes1) > 0 & len(bboxes2) > 0:
+    if (len(bboxes1) > 0) & (len(bboxes2) > 0):
         ade = calc_ade(bboxes1, bboxes2)
         fde = calc_fde(bboxes1, bboxes2)
         aiou = calc_aiou(bboxes1, bboxes2) * 100
@@ -87,16 +94,16 @@ def eval_seq(label_root, pred_length=30, gt_folder='future', pred_folder='pred')
     return aiou, fiou, ade, fde
 
 
-def eval(label_root, pred_length=30, gt_folder='future', pred_folder='pred'):
+def eval(label_root, pred_length=30, gt_folder='future', pred_folder='pred', filename=None):
     seqs = [s for s in os.listdir(label_root)]
 
     aious = []
     fious = []
     ades = []
     fdes = []
-
+    i=0
     for seq in seqs:
-        seq_label_root = osp.join(label_root, seq, gt_folder)
+        seq_label_root = osp.join(label_root, seq)
 
         aiou, fiou, ade, fde = eval_seq(seq_label_root, pred_length, gt_folder, pred_folder)
 
@@ -111,6 +118,10 @@ def eval(label_root, pred_length=30, gt_folder='future', pred_folder='pred'):
         print('FIOU: ', round(fiou, 1))
         print('ADE:  ', round(ade, 1))
         print('FDE:  ', round(fde, 1))
+       
+        if filename:
+            save_result(filename, [aious, fious, ades, fdes], seqs[:i+1], ["aiou", "fiou", "ade", "fde"])
+        i += 1
 
     print()
     aiou = round(np.mean(aious), 1)
@@ -124,7 +135,10 @@ def eval(label_root, pred_length=30, gt_folder='future', pred_folder='pred'):
     print('ADE:  ', ade)
     print('FDE:  ', fde)
 
-    return aiou, fiou, ade, fde
+    # if filename:
+    #     save_result(filename, [aious, fious, ades, fdes], seqs, ["aiou", "fiou", "ade", "fde"])
+
+    return aious, fious, ades, fdes
 
 def save_result(filename, result, index, columns):
     result = np.array(result).T
