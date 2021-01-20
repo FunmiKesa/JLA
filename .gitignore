@@ -1,7 +1,6 @@
 .idea
 *.pyc
 __pycache__
-data/**
 *.jpg
 data/
 exp/
