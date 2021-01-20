@@ -103,7 +103,7 @@ def eval(label_root, pred_length=30, gt_folder='future', pred_folder='pred'):
     fdes = []
 
     for seq in seqs:
-        seq_label_root = osp.join(label_root, seq, gt_folder)
+        seq_label_root = osp.join(label_root, seq)
 
         aiou, fiou, ade, fde = eval_seq(seq_label_root, pred_length, gt_folder, pred_folder)
 
