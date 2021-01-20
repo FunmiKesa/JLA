@@ -1,5 +1,5 @@
 {
-    "root":"/media2/funmi/MOT",
+    "root":"../data/MOT",
     "train":
     {
         "mot17":"./data/mot17.train",

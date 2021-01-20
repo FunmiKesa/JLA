@@ -16,7 +16,8 @@ class EncoderRNN(nn.Module):
             self.encoder3 = nn.GRUCell(self.input_size, self.num_hidden)
 
     def forward(self, input, val=False):
-        context = torch.tensor(torch.zeros(input.size(0), self.num_hidden, dtype=torch.float), device=self.device)
+        context = torch.tensor(torch.zeros(input.size(
+            0), self.num_hidden, dtype=torch.float), device=self.device)
 
         forecast_sequence = input.size()[1]
         for i in range(forecast_sequence):
@@ -70,7 +71,7 @@ class DecoderRNN(nn.Module):
             # generate input
             decoded_inputs = []
             h_t = context
-            
+
             for i in range(past_length-1, -1, -1):
                 h_t = self.decoder1(encoded_context, h_t)
                 input = self.fc_in(h_t)
@@ -94,17 +95,20 @@ class DecoderRNN(nn.Module):
         outputs = torch.stack(outputs, 1)
         # outputs = outputs.view(-1, future_length*self.output_size )
         result.append(outputs)
-        
+
         return result
+
 
 class Cumsum(nn.Module):
     def forward(self, last, pred):
         # cumsum
         cs = last + torch.cumsum(pred, dim=1)
         return cs
+
+
 class ForeCastRNN(nn.Module):
     def __init__(self, device, input_size, output_size, future_length, num_hidden, num_layers,  dropout=0):
-        super(ForeCastRNN,self).__init__()
+        super(ForeCastRNN, self).__init__()
         self.device = device
         self.num_hidden = num_hidden
         self.num_layers = num_layers
@@ -113,20 +117,20 @@ class ForeCastRNN(nn.Module):
         self.future_length = future_length
         self.dropout = dropout
         self.encoder = EncoderRNN(
-                self.device,self.input_size, self.num_hidden, self.num_layers)
+            self.device, self.input_size, self.num_hidden, self.num_layers)
         self.decoder = DecoderRNN(
-                self.device, input_size, output_size, self.num_hidden, self.dropout, self.num_layers)
+            self.device, input_size, output_size, self.num_hidden, self.dropout, self.num_layers)
 
         self.final = Cumsum()
 
     def forward(self, prev_bboxes, features=None):
         context = self.encoder(prev_bboxes)
         past_length = prev_bboxes.shape[1]
-        
-        output= self.decoder(context, features, self.future_length, past_length=past_length)
 
-        last = prev_bboxes[:,:1,:4]
+        output = self.decoder(
+            context, features, self.future_length, past_length=past_length)
+
+        last = prev_bboxes[:, -1:, :4]
         output[-1] = self.final(last, output[-1])
-        
+
         return output
-        

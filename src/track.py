@@ -21,9 +21,11 @@ import datasets.dataset.jde as datasets
 
 from tracking_utils.utils import mkdir_if_missing
 from opts import opts
-
+import shutil
 
 def write_results_forecasts(dir, results):
+    if os.path.exists(dir):
+        shutil.rmtree(dir)
     mkdir_if_missing(dir)
     for frame_id, forecasts in results:
         filename = os.path.join(dir, '{:06d}.txt'.format(frame_id))
@@ -188,7 +190,7 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
         # evaluate forecast results
         if opt.forecast:
             logger.info('Evaluate seq (forecast): {}'.format(seq))
-            future_label_root = osp.join(opt.forecast_root, seq, 'future')
+            future_label_root = osp.join(opt.forecast_root, seq)
 
             from forecast_utils import evaluation
             aiou, fiou, ade, fde = evaluation.eval_seq(future_label_root)
@@ -224,13 +226,13 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
 
     # get summary
 
-    summary = Evaluator.get_summary(accs, seqs, metrics)
-    strsummary = mm.io.render_summary(
-        summary,
-        formatters=mh.formatters,
-        namemap=mm.io.motchallenge_metric_names
-    )
-    print(strsummary)
+    # summary = Evaluator.get_summary(accs, seqs, metrics)
+    # strsummary = mm.io.render_summary(
+    #     summary,
+    #     formatters=mh.formatters,
+    #     namemap=mm.io.motchallenge_metric_names
+    # )
+    # print(strsummary)
     # Evaluator.save_summary(summary, os.path.join(
         # result_root, 'summary_{}.xlsx'.format(exp_name)))
     summary.to_csv(os.path.join(
@@ -248,10 +250,10 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
         print('ADE:  ', ade)
         print('FDE:  ', fde)
 
-        filename = os.path.join(
-            result_root, 'forecast_{}.csv'.format(exp_name))
+        # filename = os.path.join(
+            # result_root, 'forecast_{}.csv'.format(exp_name))
 
-        evaluation.save_result(filename, [aious, fious, ades, fdes], seqs, ["aiou", "fiou", "ade", "fde"])
+        # evaluation.save_result(filename, [aious, fious, ades, fdes], seqs, ["aiou", "fiou", "ade", "fde"])
 
 
 if __name__ == '__main__':

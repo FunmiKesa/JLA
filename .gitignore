@@ -1,8 +1,10 @@
 .idea
-.fairmot
 *.pyc
 __pycache__
-data/**
-*.jpg
-data/
-exp/
+# *.jpgx
+/data/
+/exp
+DCNv2
+.vscode/
+/models
+*.zip

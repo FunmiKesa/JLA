@@ -13,8 +13,8 @@ def chunker1(seq, size, start_index):
     return ((pos,seq.iloc[pos+start_index
     :pos + size + start_index]) for pos in range(0, len(seq)))
 
-seq_root = 'data/MOT/MOT20/images/train'
-label_root = 'data/MOT/MOT20/labels_with_ids/train'
+seq_root = 'data/MOT/MOT16/images/train'
+label_root = 'data/MOT/MOT16/labels_with_ids/train'
 mkdirs(label_root)
 seqs = [s for s in os.listdir(seq_root)]
 # seqs = ['ADL-Rundle-6', 'ETH-Bahnhof', 'KITTI-13', 'PETS09-S2L1', 'TUD-Stadtmitte', 'ADL-Rundle-8', 'KITTI-17', 'ETH-Pedcross2', 'ETH-Sunnyday', 'TUD-Campus', 'Venice-2']
@@ -43,7 +43,7 @@ for seq in seqs:
         shutil.rmtree(past_label_root)
 
     mkdirs(past_label_root)
-    future_length = 90
+    future_length = 60
     past_length = 30
 
     bboxes = []
@@ -91,6 +91,7 @@ for seq in seqs:
         group_reverse = group.iloc[::-1]
         fids_reverse = fids[::-1]
         for i, c in chunker1(group_reverse, past_length, 1):
+            # c = c.iloc[::-1]
             v = c.reset_index().pivot(index='tid', columns=['index'], values='cord')
             if v.empty:
                 continue

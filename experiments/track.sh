@@ -3,5 +3,7 @@ cd src
 
 # python train.py mot --load_model /home/funmi/Experiments/FairMOT/models/ctdet_coco_dla_2x.pth --data_cfg ../src/lib/cfg/mot16.json --batch_size 12 --gpus 0,1 --forecast --num_epochs 30 --arch rnnforecast_34 --exp_id rnnforecast_34_mask
 
-python train.py mot --load_model /home/funmi/Experiments/FairMOT/models/ctdet_coco_dla_2x.pth --data_cfg ../src/lib/cfg/mot16.json --batch_size 12 --gpus 0,1 --forecast --num_epochs 30 --arch rnnforecast_34 --exp_id reverse_past_bboxes
+# python train.py mot --load_model /home/funmi/Experiments/FairMOT/models/ctdet_coco_dla_2x.pth --data_cfg ../src/lib/cfg/mot16.json --batch_size 12 --gpus 0,1 --forecast --num_epochs 30 --arch rnnforecast_34 --exp_id reverse_past_bboxes
+
+python track.py mot --load_model /home/funmi/Experiments/FairMOT/exp/mot/rnnforecast_34_16_debug/model_last.pth --conf_thres 0.6 --val_mot16 --batch_size 1 --gpu 0 --exp_id rnnforecast_34_16_debug
 cd ..
