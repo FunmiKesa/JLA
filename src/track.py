@@ -21,9 +21,11 @@ import datasets.dataset.jde as datasets
 
 from tracking_utils.utils import mkdir_if_missing
 from opts import opts
-
+import shutil
 
 def write_results_forecasts(dir, results):
+    if os.path.exists(dir):
+        shutil.rmtree(dir)
     mkdir_if_missing(dir)
     for frame_id, forecasts in results:
         filename = os.path.join(dir, '{:06d}.txt'.format(frame_id))
@@ -188,7 +190,7 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
         # evaluate forecast results
         if opt.forecast:
             logger.info('Evaluate seq (forecast): {}'.format(seq))
-            future_label_root = osp.join(opt.forecast_root, seq, 'future')
+            future_label_root = osp.join(opt.forecast_root, seq)
 
             from forecast_utils import evaluation
             aiou, fiou, ade, fde = evaluation.eval_seq(future_label_root)

@@ -18,42 +18,71 @@ mm.lap.default_solver = 'lap'
 
 
 def eval_seq(label_root, pred_length=30, gt_folder='future', pred_folder='pred'):
-    future_bboxes = []
-    pred_bboxes = []
-    for filename in sorted(glob.glob(label_root + "/*.txt")):
-        # check if file exist in pred folder
-        pred_filename = filename.replace(gt_folder, pred_folder)
-        if not osp.exists(pred_filename):
-            continue
+    bboxes1 = []
+    bboxes2 = []
+    gt_files  = sorted(glob.glob(label_root + f"/{gt_folder}/*.txt"))
+    pred_files = sorted(glob.glob(label_root + f"/{pred_folder}/*.txt"))
 
-        bbox, mask = load_txt(filename, column_length=pred_length*4+1)
-        mask = mask[:, 1:].reshape(mask.shape[0], -1, 4)
-        future_bbox = bbox[:, 1:].reshape(bbox.shape[0], pred_length, -1)
+    if len(pred_files) < len(gt_files):
+        larger, smaller = gt_files, pred_files
+        larger_folder, smaller_folder = gt_folder, pred_folder
 
-        bbox, _ = load_txt(pred_filename, column_length=pred_length*4+1)
-        pred_bbox = bbox[:, 1:].reshape(bbox.shape[0], pred_length, -1)
+    else:
+        smaller, larger = gt_files, pred_files
+        smaller_folder, larger_folder = gt_folder, pred_folder
 
-        f, p = future_bbox[:, 0, :], pred_bbox[:, 0, :]
+
+    intersect = [filename for filename in smaller if filename.replace(smaller_folder, larger_folder) in larger]
+
+    for filename1 in intersect:
+
+        filename2 = filename1.replace(smaller_folder, larger_folder)
         
+        bbox1, mask1 = load_txt(filename1, column_length=pred_length*4+1)
+        mask1 = mask1[:, 1:].reshape(mask1.shape[0], -1, 4)
+        bbox1 = bbox1[:, 1:].reshape(bbox1.shape[0], pred_length, -1)
+
+        bbox2, mask2 = load_txt(filename2, column_length=pred_length*4+1)
+        mask2 = mask2[:, 1:].reshape(mask2.shape[0], -1, 4)
+        bbox2 = bbox2[:, 1:].reshape(bbox2.shape[0], pred_length, -1)
+
+        b1, b2 = bbox1[:, 0, :], bbox2[:, 0, :]
+
         # get distance matrix
-        dists = mm.distances.iou_matrix(f, p, max_iou=0.5)
+        dists = mm.distances.iou_matrix(b1, b2, max_iou=0.5)
 
         valid_i, valid_j = np.where(np.isfinite(dists))
 
-        future_bbox = future_bbox[valid_i]
-        mask = mask[valid_i]
-        pred_bbox = pred_bbox[valid_j] * mask
+        bbox1 = bbox1[valid_i]
+        mask1 = mask1[valid_i]
 
-        future_bboxes += [future_bbox]
-        pred_bboxes += [pred_bbox]
+        bbox2 = bbox2[valid_j]
+        mask2 = mask2[valid_j]
 
-    future_bboxes = np.concatenate(future_bboxes)
-    pred_bboxes = np.concatenate(pred_bboxes)
+        mask = mask1 & mask2
+        bbox1 *= mask
+        bbox2 *= mask
 
-    ade = calc_ade(future_bboxes, pred_bboxes)
-    fde = calc_fde(future_bboxes, pred_bboxes)
-    aiou = calc_aiou(future_bboxes, pred_bboxes) * 100
-    fiou = calc_fiou(future_bboxes, pred_bboxes) * 100
+        bboxes1 += [bbox1]
+        bboxes2 += [bbox2]
+    
+    if len(bboxes1) > 0:
+        bboxes1 = np.concatenate(bboxes1)
+    else:
+        bboxes1 = np.array([])
+
+    if len(bboxes2) > 0:
+        bboxes2 = np.concatenate(bboxes2)
+    else:
+        bboxes2 = np.array([])
+
+    aiou, fiou, ade, fde = 0, 0, 0, 0 
+
+    if len(bboxes1) > 0 & len(bboxes2) > 0:
+        ade = calc_ade(bboxes1, bboxes2)
+        fde = calc_fde(bboxes1, bboxes2)
+        aiou = calc_aiou(bboxes1, bboxes2) * 100
+        fiou = calc_fiou(bboxes1, bboxes2) * 100
 
     return aiou, fiou, ade, fde
 
