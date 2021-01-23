@@ -75,7 +75,7 @@ def main(seq_root, label_root, past_length=30, seq_label="img1", past_label="pas
 
 
 if __name__ == "__main__":
-    datasets = ["MOT15", "MOT16", "MOT20"]
+    datasets = ["MOT15", "MOT16", "MOT17", "MOT20"]
     for d in datasets:
         print("\n", d)
         seq_root = f'data/MOT/{d}/images/train'
