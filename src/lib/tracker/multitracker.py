@@ -20,7 +20,6 @@ from .basetrack import BaseTrack, TrackState
 from utils.post_process import ctdet_post_process
 from utils.image import get_affine_transform
 from models.utils import _tranpose_and_gather_feat
-from models.networks.forecast_rnn import EncoderRNN, DecoderRNN
 
 
 class STrack(BaseTrack):
@@ -239,11 +238,6 @@ class JDETracker(object):
             self.hidden_size = self.forecast['hidden_size']
             self.input_size = self.forecast['input_size']
             self.output_size = self.forecast['output_size']
-            self.encoder = EncoderRNN(
-                self.opt.device, self.input_size, self.hidden_size, 1).to(self.opt.device)
-            self.decoder = DecoderRNN(self.opt.device, self.input_size,
-                                      self.output_size, self.hidden_size, 0, 1).to(self.opt.device)
-
     def post_process(self, dets, meta):
         dets = dets.detach().cpu().numpy()
         dets = dets.reshape(1, -1, dets.shape[2])
@@ -558,7 +552,7 @@ class JDETracker(object):
         logger.debug('Removed: {}'.format(
             [track.track_id for track in removed_stracks]))
 
-        viz = True
+        viz = False
         if len(selected_strack) > 0:
             for i, tid in enumerate(selected_strack):
                 t = selected_strack[tid]
