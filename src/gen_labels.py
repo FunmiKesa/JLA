@@ -18,12 +18,12 @@ def gen_labels_15(seq_root, label_root, seq_label="img1", gt_label="gt"):
         seq_width = int(seq_info[seq_info.find('imWidth=') + 8:seq_info.find('\nimHeight')])
         seq_height = int(seq_info[seq_info.find('imHeight=') + 9:seq_info.find('\nimExt')])
 
-        gt_txt = osp.join(seq_root, seq, 'gt', 'gt.txt')
+        gt_txt = osp.join(seq_root, seq, gt_label, f'{gt_label}.txt')
         gt = np.loadtxt(gt_txt, dtype=np.float64, delimiter=',')
         idx = np.lexsort(gt.T[:2, :])
         gt = gt[idx, :]
 
-        seq_label_root = osp.join(label_root, seq, 'img1')
+        seq_label_root = osp.join(label_root, seq, seq_label)
         mkdirs(seq_label_root)
 
         for fid, tid, x, y, w, h, mark, _, _, _ in gt:

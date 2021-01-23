@@ -15,7 +15,7 @@ def chunker1(seq, size, start_index):
     return ((pos, seq.iloc[pos+start_index:pos + size + start_index]) for pos in range(0, len(seq)))
 
 
-def main(seq_root, label_root, future_length=60, seq_label="img1", future_label="past"):
+def main(seq_root, label_root, future_length=60, seq_label="img1", future_label="future"):
     seqs = [s for s in os.listdir(seq_root)]
     for seq in seqs:
         print(seq)
