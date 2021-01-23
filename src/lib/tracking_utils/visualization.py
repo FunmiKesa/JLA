@@ -25,7 +25,7 @@ def resize_image(image, max_size=800):
     return image
 
 
-def plot_tracking(image, tlwhs, obj_ids, scores=None, frame_id=0, fps=0., ids2=None):
+def plot_tracking(image, tlwhs, obj_ids, scores=None, frame_id=0, fps=0., ids2=None, forecasts=None):
     im = np.ascontiguousarray(np.copy(image))
     im_h, im_w = im.shape[:2]
 
@@ -51,6 +51,22 @@ def plot_tracking(image, tlwhs, obj_ids, scores=None, frame_id=0, fps=0., ids2=N
         cv2.rectangle(im, intbox[0:2], intbox[2:4], color=color, thickness=line_thickness)
         cv2.putText(im, id_text, (intbox[0], intbox[1] + 30), cv2.FONT_HERSHEY_PLAIN, text_scale, (0, 0, 255),
                     thickness=text_thickness)
+    
+    for i, tlwhs in enumerate(forecasts):
+        obj_id = tlwhs[0]
+        tlwhs = tlwhs[1:].reshape(-1, 4)
+        cx, cy, w, h = tlwhs[0]
+        intbox = tuple(map(int, (cx - w/2, cy - h/2, cx + w/2, cy + h/2)))
+        color = get_color(abs(obj_id))
+        cv2.rectangle(im, intbox[0:2], intbox[2:4], color=color, thickness=line_thickness)
+
+        for j in range(0, len(tlwhs), 5):
+            bbox_pred = tlwhs[j]
+            bbox_pred = [int(v) for v in bbox_pred]
+            cx, cy = bbox_pred[0], bbox_pred[1] 
+
+            cv2.rectangle(im, (cx-j//2, cy-j//2), (cx+j//2, cy+j//2), color, line_thickness)
+
     return im
 
 
