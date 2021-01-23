@@ -125,7 +125,7 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
         #results.append((frame_id + 1, online_tlwhs, online_ids, online_scores))
         if show_image or save_dir is not None:
             online_im = vis.plot_tracking(img0, online_tlwhs, online_ids, frame_id=frame_id,
-                                          fps=1. / timer.average_time)
+                                          fps=1. / timer.average_time, forecasts=online_forecasts)
         if show_image:
             cv2.imshow('online_im', online_im)
         if save_dir is not None:
@@ -186,6 +186,8 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
             namemap=mm.io.motchallenge_metric_names
         )
         print(strsummary)
+        summary.to_csv(os.path.join(
+        result_root, 'summary_{}.csv'.format(exp_name)))
 
         # evaluate forecast results
         if opt.forecast:
@@ -235,8 +237,8 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
     # print(strsummary)
     # Evaluator.save_summary(summary, os.path.join(
         # result_root, 'summary_{}.xlsx'.format(exp_name)))
-    summary.to_csv(os.path.join(
-        result_root, 'summary_{}.csv'.format(exp_name)))
+    # summary.to_csv(os.path.join(
+    #     result_root, 'summary_{}.csv'.format(exp_name)))
 
     if opt.forecast:
         aiou = round(np.mean(aious), 1)
@@ -367,5 +369,6 @@ if __name__ == '__main__':
          seqs=seqs,
          exp_name=opt.exp_id,
          show_image=False,
-         save_images=False,
-         save_videos=False)
+        #  save_images=True,
+        #  save_videos=True
+         )
