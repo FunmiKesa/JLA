@@ -526,7 +526,7 @@ class RNNForecast(nn.Module):
             output_size = forecast['output_size']
             future_length = forecast['future_length']
 
-            self.rnn = ForeCastRNN(device, input_size, output_size, future_length, hidden_size, 1, 0)
+            self.rnn = ForeCastRNN(device, input_size, output_size, future_length, hidden_size, 'fct' in heads )
             
         self.heads = heads
         for head in self.heads:
@@ -573,10 +573,14 @@ class RNNForecast(nn.Module):
             z[head] = self.__getattr__(head)(y[-1])
 
         if self.forecast:
-            # f = z['fct']
-            # fs = f.shape
-            # f =  f.permute(0,2,3,1).contiguous().view(-1, fs[1]).contiguous()
-            z['fct'] = self.rnn(prev)
+            f = None
+            if 'fct' in z:
+                f = z['fct']
+                batch, cat, height, width = f.size()
+                K = 500
+                f, _ = torch.topk(f.view(batch, cat, -1), K)
+                f =  f.permute(0, 2, 1).contiguous().view(-1, cat).contiguous()
+            z['fct'] = self.rnn(prev, f)
         
         output = [z]
         return output
