@@ -5,6 +5,7 @@ from __future__ import print_function
 import torch
 import numpy as np
 import pandas as pd
+import functools
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -179,20 +180,27 @@ def encode_delta(gt_box_list, fg_anchor_list):
     dh = np.log(gh/ph)
     return np.stack((dx, dy, dw, dh), axis=1)
 
-
+@functools.lru_cache(maxsize=None)
 def load_txt(filepath, column_length, max_column=400):
-    header = [f"h_{i}" for i in range(max_column+5)]
-    columns = [f"h_{i}" for i in range(column_length)]
-    data = pd.read_csv(filepath, sep=" ", names=header)
-    # data.dropna(axis=1, inplace=True)
-    if column_length <= data.shape[1]:
-        data = data[columns]
-    data = data.values
-    
-    mask = (~np.isnan(data)).astype(np.int)
+    try:
+        header = [f"h_{i}" for i in range(max_column+5)]
+        columns = [f"h_{i}" for i in range(column_length)]
+        data = pd.read_csv(filepath, sep=" ", names=header, lineterminator='\n')
+        # data.dropna(axis=1, inplace=True)
+        if column_length <= data.shape[1]:
+            data = data[columns]
+        data = data.values
+        
+        mask = (~np.isnan(data)).astype(np.int)
 
-    # change nan values to 0
-    data = np.nan_to_num(data)
+        # change nan values to 0
+        data = np.nan_to_num(data)
 
-    return data, mask
+        return data, mask
+
+
+    except Exception as ex:
+        print(filepath)
+        print(ex)
+
     
