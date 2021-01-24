@@ -185,7 +185,7 @@ def load_txt(filepath, column_length, max_column=400):
     try:
         header = [f"h_{i}" for i in range(max_column+5)]
         columns = [f"h_{i}" for i in range(column_length)]
-        data = pd.read_csv(filepath, sep=" ", names=header, lineterminator='\n')
+        data = pd.read_csv(filepath, sep=" ", names=header, engine='python')
         # data.dropna(axis=1, inplace=True)
         if column_length <= data.shape[1]:
             data = data[columns]
@@ -200,7 +200,7 @@ def load_txt(filepath, column_length, max_column=400):
 
 
     except Exception as ex:
-        print(filepath)
+        print(filepath, '\n')
         print(ex)
 
     
