@@ -15,7 +15,7 @@ python train.py mot \
 python track.py mot \
 --exp_id 'mot16_rnnforecast34_embedding_60' \
 --arch 'rnnforecast_34' \
---load_model '../exp/mot/mot16_rnnforecast34_embedding_60/model_last.pth'
+--load_model '../exp/mot/mot16_rnnforecast34_embedding_60/model_last.pth' \
 --conf_thres '0.6' \
 --batch_size '8' \
 --gpu '0,1' \
