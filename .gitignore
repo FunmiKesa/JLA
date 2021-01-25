@@ -8,3 +8,5 @@ DCNv2
 .vscode/
 /models
 *.zip
+.fairmot
+/demos/
