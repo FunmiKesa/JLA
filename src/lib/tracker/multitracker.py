@@ -25,7 +25,7 @@ from models.utils import _tranpose_and_gather_feat
 class STrack(BaseTrack):
     shared_kalman = KalmanFilter()
 
-    def __init__(self, tlwh, score, temp_feat, buffer_size=30):
+    def __init__(self, tlwh, score, temp_feat, buffer_size=30, past_length=15):
 
         # wait activate
         self._tlwh = np.asarray(tlwh, dtype=np.float)
@@ -39,7 +39,7 @@ class STrack(BaseTrack):
         self.smooth_feat = None
         self.update_features(temp_feat)
         self.features = deque([], maxlen=buffer_size)
-        self.pasts = deque([], maxlen=15)
+        self.pasts = deque([], maxlen=past_length)
         self.alpha = 0.9
         self.forecasts = []
 
@@ -232,6 +232,7 @@ class JDETracker(object):
         self.kalman_filter = KalmanFilter()
 
         self.forecast = opt.forecast
+        self.past_length = 0
         if self.forecast:
             self.past_length = self.forecast['past_length']
             self.future_length = self.forecast['future_length']
@@ -435,7 +436,7 @@ class JDETracker(object):
             # if self.opt.forecast:
             #     detections = [STrack(STrack.tlbr_to_tlwh(tlbrs[:4]), tlbrs[4], f, 30, ft) for (tlbrs, f, ft) in zip(dets[:, :5], id_feature, pred_futures)]
             # else:
-            detections = [STrack(STrack.tlbr_to_tlwh(tlbrs[:4]), tlbrs[4], f, 30) for (
+            detections = [STrack(STrack.tlbr_to_tlwh(tlbrs[:4]), tlbrs[4], f, 30, past_length=self.past_length) for (
                 tlbrs, f) in zip(dets[:, :5], id_feature)]
         else:
             detections = []
