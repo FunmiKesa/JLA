@@ -115,10 +115,6 @@ if __name__ == "__main__":
                     cv_label_root = seq_label_root.replace(
                         'labels_with_ids', cv_label)
 
-                    if osp.exists(cv_label_root):
-                        print(f"{cv_label_root} exists!")
-                        continue
-
                     gen_cv_files(seq_label_root, cv_label_root,
                                  img_size=img_size)
 
