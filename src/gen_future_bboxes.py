@@ -15,6 +15,7 @@ def mkdirs(d):
 def chunker1(seq, size, start_index):
     return ((pos, seq.iloc[pos+start_index:pos + size + start_index]) for pos in range(0, len(seq)))
 
+
 def gen_future_files(seq_label_root, future_label_root, future_length=60, img_size=None):
     if os.path.exists(future_label_root):
         shutil.rmtree(future_label_root)
@@ -29,7 +30,8 @@ def gen_future_files(seq_label_root, future_label_root, future_length=60, img_si
             label_fpath = osp.join(future_label_root, fname)
             label_file_paths[fid] = label_fpath
         else:
-            print("Incorrect data: frame_id in filenames are not unique. Please inspect your data.")
+            print(
+                "Something is not right! Frame id should be unique. Please check the source code and data.")
 
         bbox = np.loadtxt(filepath, dtype=np.float64)
         if len(bbox) == 0:
@@ -84,6 +86,7 @@ def gen_future_files(seq_label_root, future_label_root, future_length=60, img_si
             label_fpath = label_file_paths[fid]
             with open(label_fpath, 'a+') as f:
                 f.write(label_str)
+
 
 def main(seq_root, label_root, future_length=60, seq_label="img1", future_label="future"):
     seqs = [s for s in os.listdir(seq_root)]
@@ -181,29 +184,27 @@ if __name__ == "__main__":
                     #     continue
 
                     gen_future_files(seq_label_root, future_label_root,
-                                   future_length, img_size)
+                                     future_length, img_size)
 
             elif 'Caltech' in d:
                 seq_root = f'data/{d}/data/images'
                 label_root = f'data/{d}/data/labels_with_ids'
-                values = []
                 img_size = (480, 640)
 
                 future_label_root = label_root.replace(
                     'labels_with_ids', future_label)
 
                 gen_future_files(label_root, future_label_root, future_length,
-                               img_size)
-            
+                                 img_size)
+
             elif 'PRW' in d:
                 seq_root = f'data/{d}/images'
                 label_root = f'data/{d}/labels_with_ids'
-                values = []
 
-                # def extract_fid(x): 
+                # def extract_fid(x):
                 #     global values
                 #     xarr = x.split('_')
-                #     seq = f"{xarr[-2].replace('c','').replace('s','')}{xarr[-1]}"  
+                #     seq = f"{xarr[-2].replace('c','').replace('s','')}{xarr[-1]}"
                 #     fid = int(seq)
                 #     if fid in values:
                 #         print('Duplicate!!!',fid, seq, x)
@@ -217,13 +218,13 @@ if __name__ == "__main__":
                     'labels_with_ids', future_label)
 
                 gen_future_files(label_root, future_label_root, future_length,
-                               img_size)
+                                 img_size)
 
             elif 'CUHKSYSU' in d:
                 seq_root = f'data/{d}/images'
                 label_root = f'data/{d}/labels_with_ids'
-                
-                # def extract_fid(x): 
+
+                # def extract_fid(x):
                 #     return int(x.replace('s', ''))
 
                 future_label_root = label_root.replace(
@@ -232,11 +233,10 @@ if __name__ == "__main__":
                 img_size = (800, 600)
 
                 gen_future_files(label_root, future_label_root, future_length,
-                               img_size)
-                  
+                                 img_size)
+
             else:
                 print('Data format not known.')
 
         except Exception as ex:
             print(d, ' failed due to ', ex)
-    
