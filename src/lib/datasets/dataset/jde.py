@@ -410,9 +410,9 @@ class JointDataset(LoadImagesAndLabels):  # for training
 
             if self.forecast:
                 self.forecast_future_files[ds] = [
-                    x.replace('img1', 'future') for x in self.label_files[ds]]
+                    x.replace('labels_with_ids', 'future') for x in self.label_files[ds]]
                 self.forecast_past_files[ds] = [
-                    x.replace('img1', 'past') for x in self.label_files[ds]]
+                    x.replace('labels_with_ids', 'past') for x in self.label_files[ds]]
 
         for ds, label_paths in self.label_files.items():
             max_index = -1

@@ -11,6 +11,7 @@ def mkdirs(d):
 
 def gen_labels_15(seq_root, label_root, seq_label="img1", gt_label="gt"):
     seqs = [s for s in os.listdir(seq_root)]
+    seqs.sort()
 
     tid_curr = 0
     tid_last = -1
@@ -49,6 +50,7 @@ def gen_labels_15(seq_root, label_root, seq_label="img1", gt_label="gt"):
 
 def gen_labels(seq_root, label_root, seq_label="img1", gt_label="gt"):
     seqs = [s for s in os.listdir(seq_root)]
+    seqs.sort()
 
     tid_curr = 0
     tid_last = -1
@@ -87,8 +89,8 @@ if __name__ == "__main__":
     datasets = ["MOT15", "MOT16", "MOT17", "MOT20"]
     for d in datasets:
         print("\n", d)
-        seq_root = f'data/MOT/{d}/images/train'
-        label_root = f'data/MOT/{d}/labels_with_ids/train'
+        seq_root = f'data/{d}/images/train'
+        label_root = f'data/{d}/labels_with_ids/train'
         if not osp.exists(seq_root) | osp.exists(label_root):
             print(f"{seq_root} not found or {label_root} exists!")
             continue

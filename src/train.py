@@ -12,7 +12,6 @@ import torch.utils.data
 from torchvision.transforms import transforms as T
 from opts import opts
 from models.model import create_model, load_model, save_model, create_model_forecast
-from models.data_parallel import DataParallel
 from logger import Logger
 from datasets.dataset_factory import get_dataset
 from trains.train_factory import train_factory
@@ -30,7 +29,8 @@ def main(opt):
     dataset_root = data_config['root']
     f.close()
     transforms = T.Compose([T.ToTensor()])
-    dataset = Dataset(opt, dataset_root, trainset_paths, (1088, 608), augment=False, transforms=transforms)
+    dataset = Dataset(opt, dataset_root, trainset_paths,
+                      (1088, 608), augment=False, transforms=transforms)
     opt = opts().update_dataset_info_and_set_heads(opt, dataset)
     print(opt)
 
@@ -40,7 +40,8 @@ def main(opt):
     opt.device = torch.device('cuda' if opt.gpus[0] >= 0 else 'cpu')
 
     print('Creating model...')
-    model = create_model_forecast(opt.arch, opt.heads, opt.head_conv, opt) if opt.forecast else create_model(opt.arch, opt.heads, opt.head_conv)
+    model = create_model_forecast(opt.arch, opt.heads, opt.head_conv, opt) if opt.forecast else create_model(
+        opt.arch, opt.heads, opt.head_conv)
     optimizer = torch.optim.Adam(model.parameters(), opt.lr)
     start_epoch = 0
 
@@ -54,22 +55,6 @@ def main(opt):
         pin_memory=True,
         drop_last=True
     )
-
-    # validate
-    valset_paths = data_config['test']
-
-    if valset_paths != trainset_paths:
-
-        val_dataset = Dataset(opt, dataset_root, valset_paths, (1088, 608), augment=False, transforms=transforms)
-        val_loader = torch.utils.data.DataLoader(
-            val_dataset,
-            batch_size=opt.batch_size,
-            shuffle=False,
-            num_workers=opt.num_workers,
-            pin_memory=True,
-            drop_last=True
-        )
-
 
     print('Starting training...')
     Trainer = train_factory[opt.task]
@@ -87,12 +72,6 @@ def main(opt):
         for k, v in log_dict_train.items():
             logger.scalar_summary('train_{}'.format(k), v, epoch)
             logger.write('{} {:8f} | '.format(k, v))
-        if valset_paths != trainset_paths:
-            with torch.no_grad():
-                val_log_dict_train, _ = trainer.val(epoch, val_loader)
-            for k, v in val_log_dict_train.items():
-                logger.scalar_summary('val_{}'.format(k), v, epoch)
-                logger.write('{} {:8f} | '.format(k, v))
 
         if opt.val_intervals > 0 and epoch % opt.val_intervals == 0:
             save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(mark)),

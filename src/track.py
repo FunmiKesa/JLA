@@ -7,7 +7,6 @@ import os
 import os.path as osp
 import cv2
 import logging
-import argparse
 import motmetrics as mm
 import numpy as np
 import torch
@@ -134,7 +133,8 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
         frame_id += 1
     # save results
     write_results(result_filename, results, data_type)
-    write_results_forecasts(opt.forecast_dir, forecast_results)
+    if len(forecast_results):
+        write_results_forecasts(opt.forecast_dir, forecast_results)
     #write_results_score(result_filename, results, data_type)
     return frame_id, timer.average_time, timer.calls
 
@@ -192,7 +192,7 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
         # evaluate forecast results
         if opt.forecast:
             logger.info('Evaluate seq (forecast): {}'.format(seq))
-            future_label_root = osp.join(opt.forecast_root, seq)
+            future_label_root = osp.join(opt.forecast_root, seq, 'img1')
 
             from forecast_utils import evaluation
             aiou, fiou, ade, fde = evaluation.eval_seq(future_label_root)
@@ -290,7 +290,7 @@ if __name__ == '__main__':
                       MOT16-14'''
         #seqs_str = '''MOT16-01 MOT16-07 MOT16-12 MOT16-14'''
         #seqs_str = '''MOT16-06 MOT16-08'''
-        data_root = os.path.join(opt.data_dir, 'MOT16/test')
+        data_root = os.path.join(opt.data_dir, 'MOT16/images/test')
     if opt.test_mot15:
         seqs_str = '''ADL-Rundle-1
                       ADL-Rundle-3
