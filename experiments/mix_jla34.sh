@@ -1,5 +1,4 @@
 cd src
-# python train.py mot --exp_id mix_dla34 --load_model '../models/ctdet_coco_dla_2x.pth' --data_cfg '../src/lib/cfg/data.json'
 
 python train.py mot \
 --exp_id 'mix_jla34' \
@@ -87,4 +86,5 @@ python track.py mot \
 --test_mot17 \
 --forecast \
 --use_embedding
+
 cd ..
