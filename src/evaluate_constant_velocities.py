@@ -8,7 +8,7 @@ def mkdirs(d):
         os.makedirs(d)
 
 if __name__ == "__main__":
-    datasets = ["MOT15", "MOT16", "MOT17", "MOT20"]
+    datasets = ["PRW", "Caltech", "MOT15", "MOT16", "MOT17", "MOT20"]
     cv_label = 'cv_10'
     pred_length = 60
     gt_folder = 'future'
@@ -63,10 +63,8 @@ if __name__ == "__main__":
             else:
                 if 'Caltech' in d:
                     label_root = f'data/{d}/data/future'
-                    filename = f'data/{d}/data/images/results/forecasts_cv_10.csv'
                 else:
                     label_root = f'data/{d}/future'
-                    filename = f'data/{d}/images/results/forecasts_cv_10.csv'
                 
                 if not osp.exists(label_root) | osp.exists(filename):
                     continue
