@@ -553,26 +553,26 @@ class JointDataset(LoadImagesAndLabels):  # for training
             forecast_future_path = self.forecast_future_files[ds][files_index - start_index]
             if os.path.exists(forecast_future_path):
                 column_length = (self.future_length) * 4 + 1
-                forecasts, mask = load_txt(
+                futures_data, mask = load_txt(
                     forecast_future_path, column_length, max_column=361)
-                inds = forecasts[:, 0]
-                forecasts = forecasts[:, 1:]
-                n = forecasts.shape[-1] // 4
+                inds = futures_data[:, 0]
+                futures_data = futures_data[:, 1:]
+                n = futures_data.shape[-1] // 4
                 mask = mask[:, 1:].reshape(mask.shape[0], n, 4)  # [:,1:,:]
                 futures_mask[:mask.shape[0], :] = mask
                 futures_inds[:mask.shape[0]] = inds
 
-                forecasts = forecasts.reshape(forecasts.shape[0], n, 4)
+                futures_data = futures_data.reshape(futures_data.shape[0], n, 4)
 
-                labels = forecasts.copy()
+                labels = futures_data.copy()
                 labels[..., 0] = ratio * \
-                    (forecasts[..., 0] - forecasts[..., 2] / 2) + dw
+                    (futures_data[..., 0] - futures_data[..., 2] / 2) + dw
                 labels[..., 1] = ratio * \
-                    (forecasts[..., 1] - forecasts[..., 3] / 2) + dh
+                    (futures_data[..., 1] - futures_data[..., 3] / 2) + dh
                 labels[..., 2] = ratio * \
-                    (forecasts[..., 0] + forecasts[..., 2] / 2) + dw
+                    (futures_data[..., 0] + futures_data[..., 2] / 2) + dw
                 labels[..., 3] = ratio * \
-                    (forecasts[..., 1] + forecasts[..., 3] / 2) + dh
+                    (futures_data[..., 1] + futures_data[..., 3] / 2) + dh
 
                 labels = xyxy2xywh(labels.copy())
                 labels[..., [0, 2]] /= self.width
@@ -591,27 +591,27 @@ class JointDataset(LoadImagesAndLabels):  # for training
             forecast_past_path = self.forecast_past_files[ds][files_index - start_index]
             if os.path.exists(forecast_past_path):
                 column_length = (self.past_length + 1) * 4 + 1
-                forecasts, mask = load_txt(
+                pasts_data, mask = load_txt(
                     forecast_past_path, column_length, max_column=121)
-                inds = forecasts[:, 0]
-                forecasts = forecasts[:, 1:]
-                n = forecasts.shape[-1] // 4
+                inds = pasts_data[:, 0]
+                pasts_data = pasts_data[:, 1:]
+                n = pasts_data.shape[-1] // 4
                 mask = mask[:, 1:].reshape(mask.shape[0], n, 4)[:, 1:, :]
                 pasts_mask[:mask.shape[0], :, :4] = mask
                 pasts_mask[:mask.shape[0], :,  4:] = mask
                 pasts_inds[:mask.shape[0]] = inds
 
-                forecasts = forecasts.reshape(forecasts.shape[0], n, 4)
+                pasts_data = pasts_data.reshape(pasts_data.shape[0], n, 4)
 
-                labels = forecasts.copy()
+                labels = pasts_data.copy()
                 labels[..., 0] = ratio * \
-                    (forecasts[..., 0] - forecasts[..., 2] / 2) + dw
+                    (pasts_data[..., 0] - pasts_data[..., 2] / 2) + dw
                 labels[..., 1] = ratio * \
-                    (forecasts[..., 1] - forecasts[..., 3] / 2) + dh
+                    (pasts_data[..., 1] - pasts_data[..., 3] / 2) + dh
                 labels[..., 2] = ratio * \
-                    (forecasts[..., 0] + forecasts[..., 2] / 2) + dw
+                    (pasts_data[..., 0] + pasts_data[..., 2] / 2) + dw
                 labels[..., 3] = ratio * \
-                    (forecasts[..., 1] + forecasts[..., 3] / 2) + dh
+                    (pasts_data[..., 1] + pasts_data[..., 3] / 2) + dh
 
                 labels = xyxy2xywh(labels.copy())
                 labels[..., [0, 2]] /= self.width
