@@ -1,5 +1,5 @@
 {
-    "root":"../data/MOT",
+    "root":"../data",
     "train":
     {
         "mot20":"./data/mot_sample2.train"
