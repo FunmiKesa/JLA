@@ -37,15 +37,6 @@ class MotLoss(torch.nn.Module):
         self.s_id = nn.Parameter(-1.05 * torch.ones(1))
 
         if opt.forecast:
-            # from models.networks.forecast_rnn import ForeCastRNN, EncoderRNN, DecoderRNN
-            # input_size = self.opt.forecast['input_size']
-            # hidden_size = self.opt.forecast['hidden_size']
-            # output_size = self.opt.forecast['output_size']
-
-            # self.rnn = ForeCastRNN(input_size, hidden_size)
-            # self.encoder = EncoderRNN(self.opt.device, input_size, hidden_size, 1)
-            # self.decoder = DecoderRNN(self.opt.device,input_size, output_size, hidden_size, 0, 1)
-
             self.FCTLoss = nn.MSELoss()
             self.s_fct = nn.Parameter(3.94 * torch.ones(1))
 
@@ -81,105 +72,36 @@ class MotLoss(torch.nn.Module):
 
             if opt.forecast:
 
-                # fc_ = fc_all
-
-                # forecast_mask = batch['forecast_mask']
-                # fc_ = fc_.view(batch_size, m, 4, forecast_size).contiguous()
-                # fc_ = fc_[..., :opt.past_length].contiguous()
-
-                # target = batch['bb_hist'][..., 5:].permute(0, 2, 3, 1)
-
-                # forecast_mask = batch['forecast_mask'].unsqueeze(1).unsqueeze(2).expand_as(target)
-
-                # fc_ = fc_ * forecast_mask
-                # target = target * forecast_mask
-
-                # mask = batch['reg_mask'].unsqueeze(-1).unsqueeze(-1).expand_as(fc_).float()
-
-                # mask = batch['reg_mask'].unsqueeze(2).expand_as(fc_).float()
-                # fc_ = fc_ * mask
-                # target = target * mask
-
-                # fc_ = fc_[mask > 0]
-                # target = target[mask > 0]
-                # target = batch['bb_hist']
-                # batch_size, past_length, max_objs, input_size = target.shape
-                # target = target.permute(1,0,2,3).contiguous().view(past_length, -1, input_size)
-                # future_length = self.opt.forecast['future_length']
-                # context = self.encoder(target)
-
-                # fc_all = fc_all.view(-1, fc_all.size(2)).contiguous()
-                # decoded_input, output= self.decoder(context, fc_all, future_length=future_length, past_length=past_length)
-
-                # target = target.view(target.size(0), batch_size, max_objs,target.size(2)).contiguous().permute(1, 0, 2, 3).contiguous()
-                # decoded_input = decoded_input.view(decoded_input.size(0), batch_size, max_objs,decoded_input.size(2)).contiguous().permute(1, 0, 2, 3).contiguous()
-
-                # forecast_mask = batch['forecast_mask'].unsqueeze(-1).unsqueeze(-1).expand_as(target)
-
-                # decoded_input = decoded_input * forecast_mask
-                # target = target * forecast_mask
-
-                # target = target.flip([1])
-                # index = math.ceil(input_size / 2)
-
-                # target[:, :, :, index:] *= -1
-                # pasts = batch['pasts']
-
-                # pasts = pasts.permute(1, 0, 2, 3).contiguous().view(past_length, -1, input_size)
-
                 pred_pasts, pred_futures = output['fct']
 
-                # pasts = pasts.view(past_length, batch_size, max_objs, input_size).contiguous().permute(1, 0, 2, 3).contiguous()
-
-                
-
                 if opt.pasts_weight:
-                    # pasts_mask = pasts_mask.unsqueeze(-1).unsqueeze(-1).expand_as(pasts)
                     pasts = batch['input'][-1]
                     pasts_mask = batch['pasts_mask']
                     batch_size, max_objs, past_length, input_size = pasts_mask.shape
-                    
-                    # pred_pasts = pred_pasts.view( -1, max_objs, pred_pasts.size(1),pred_pasts.size(2)).contiguous()
-                    pasts_mask = pasts_mask.view( -1, pasts_mask.size(2),pasts_mask.size(3)).contiguous().float()
+
+                    pasts_mask = pasts_mask.view(-1, pasts_mask.size(
+                        2), pasts_mask.size(3)).contiguous().float()
 
                     pred_pasts = pred_pasts * pasts_mask
                     pasts = pasts * pasts_mask
 
-                    # pasts = pasts.flip([1])
-                    # index = math.ceil(input_size / 2)
-                    # pasts[..., index:] = pasts[..., index:] * -1
-
-                    # print(pasts_mask.sum([0,1]).max())
-
-
-                    pasts_loss = pasts_loss  + F.l1_loss(pred_pasts, pasts, size_average=False) / (pasts_mask.sum() + 1e-4) / opt.num_stacks
+                    pasts_loss = pasts_loss + \
+                        F.l1_loss(pred_pasts, pasts, size_average=False) / \
+                        (pasts_mask.sum() + 1e-4) / opt.num_stacks
 
                 if opt.futures_weight:
-                    # futures_mask = futures_mask.unsqueeze(-1).unsqueeze(-1).expand_as(futures)
-
                     futures = batch['futures']
                     futures_mask = batch['futures_mask']
                     batch_size, max_objs, future_length, input_size = futures_mask.shape
 
-                    # futures = futures.view(-1, max_objs, futures.size(1), futures.size(2))
-                    # pred_futures = pred_futures.view(-1, max_objs, pred_futures.size(1), pred_futures.size(
-                    # 2)).contiguous()
-
-                    futures_mask = futures_mask.view( -1, futures_mask.size(2),futures_mask.size(3)).contiguous().float()
+                    futures_mask = futures_mask.view(-1, futures_mask.size(
+                        2), futures_mask.size(3)).contiguous().float()
 
                     pred_futures = pred_futures * futures_mask
                     futures = futures * futures_mask
 
-                    # print(futures_mask.sum([0,1]).max())
                     futures_loss = futures_loss + F.l1_loss(pred_futures, futures, size_average=False) / (
                         futures_mask.sum() + 1e-4) / opt.num_stacks
-
-                # fct_loss += self.FCLoss(decoded_input * forecast_mask, target * forecast_mask) / opt.num_stacks
-
-                # fct_loss += torch.abs(decoded_input - target).sum() /(forecast_mask.sum() + 1e-4)
-                # fct_loss += torch.abs(decoded_input - target).sum() /(past_length * input_size * forecast_mask.sum())
-
-        #loss = opt.hm_weight * hm_loss + opt.wh_weight * wh_loss + opt.off_weight * off_loss + opt.id_weight * id_loss
 
         fct_loss = opt.pasts_weight * pasts_loss + opt.futures_weight * futures_loss
 
@@ -190,13 +112,8 @@ class MotLoss(torch.nn.Module):
             torch.exp(-self.s_id) * id_loss + (self.s_det + self.s_id)
 
         if self.opt.forecast:
-            # print(self.s_fct)
             loss += torch.exp(-self.s_fct) * fct_loss + self.s_fct
         loss *= 0.5
-        # print(self.s_det, torch.exp(-self.s_det) * det_loss, self.s_id, torch.exp(-self.s_id) * id_loss, self.s_fct, torch.exp(-self.s_fct) * fct_loss)
-        #loss = det_loss
-
-        #print(loss, hm_loss, wh_loss, off_loss, id_loss)
 
         loss_stats = {'loss': loss, 'hm_loss': hm_loss,
                       'wh_loss': wh_loss, 'off_loss': off_loss, 'id_loss': id_loss}
@@ -206,23 +123,9 @@ class MotLoss(torch.nn.Module):
         return loss, loss_stats
 
 
-# class MotLossFlex(MotLoss):
-#     def __init__(self, opt, model):
-#         super(MotLossFlex, self).__init__(opt)
-#         if model:
-#             if self.opt.forecast:
-#                 self.rnn = model.rnn
-
 class MotTrainer(BaseTrainer):
     def __init__(self, opt, model, optimizer=None):
         super(MotTrainer, self).__init__(opt, model, optimizer=optimizer)
-        # self.model = model
-        # if self.opt.forecast:
-        #     self.loss_stats += ['fct_loss']
-        #     self.model_with_loss.loss =  MotLossFlex(self.opt, self.model)
-
-        #     self.loss_stats += ['fct_loss']
-        #     self.model_with_loss.loss = MotLossFlex(self.opt, self.model)
 
     def _get_losses(self, opt):
         loss_stats = ['loss', 'hm_loss', 'wh_loss', 'off_loss', 'id_loss']
