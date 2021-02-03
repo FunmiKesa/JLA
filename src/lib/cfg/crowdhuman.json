@@ -1,5 +1,5 @@
 {
-    "root":"../data/MOT",
+    "root":"../data",
     "train":
     {
         "crowdhuman_train":"./data/crowdhuman.train",
