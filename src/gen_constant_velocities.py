@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import glob
 import cv2
-from utils import *
+from data_utils import *
 
 
 def gen_cv_files(seq_label_root, cv_label_root, future_length=60, past_length=10, img_size=None):

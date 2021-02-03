@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import glob
 import cv2
-from utils import *
+from data_utils import *
 
 
 def gen_past_files(seq_label_root, past_label_root, past_length=30, img_size=None):

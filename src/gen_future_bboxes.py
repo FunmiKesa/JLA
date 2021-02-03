@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import glob
 import cv2
-from utils import *
+from data_utils import *
 
 
 def gen_future_files(seq_label_root, future_label_root, future_length=60, img_size=None):
