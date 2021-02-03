@@ -19,8 +19,6 @@ from opts import opts
 from utils.image import gaussian_radius, draw_umich_gaussian, draw_msra_gaussian
 from utils.utils import xyxy2xywh, generate_anchors, xywh2xyxy, encode_delta, load_txt
 
-import pandas as pd
-
 
 class LoadImages:  # for inference
     def __init__(self, path, img_size=(1088, 608)):
@@ -302,53 +300,56 @@ def random_affine(img, targets=None, degrees=(-10, 10), translate=(.1, .1), scal
 
     # Return warped points also
     if targets is not None:
-        if len(targets) > 0:
-            n = targets.shape[0]
-            points = targets[:, 2:6].copy()
-            area0 = (points[:, 2] - points[:, 0]) * \
-                (points[:, 3] - points[:, 1])
-
-            # warp points
-            xy = np.ones((n * 4, 3))
-            xy[:, :2] = points[:, [0, 1, 2, 3, 0, 3, 2, 1]].reshape(
-                n * 4, 2)  # x1y1, x2y2, x1y2, x2y1
-            xy = (xy @ M.T)[:, :2].reshape(n, 8)
-
-            # create new boxes
-            x = xy[:, [0, 2, 4, 6]]
-            y = xy[:, [1, 3, 5, 7]]
-            xy = np.concatenate(
-                (x.min(1), y.min(1), x.max(1), y.max(1))).reshape(4, n).T
-
-            # apply angle-based reduction
-            radians = a * math.pi / 180
-            reduction = max(abs(math.sin(radians)),
-                            abs(math.cos(radians))) ** 0.5
-            x = (xy[:, 2] + xy[:, 0]) / 2
-            y = (xy[:, 3] + xy[:, 1]) / 2
-            w = (xy[:, 2] - xy[:, 0]) * reduction
-            h = (xy[:, 3] - xy[:, 1]) * reduction
-            xy = np.concatenate(
-                (x - w / 2, y - h / 2, x + w / 2, y + h / 2)).reshape(4, n).T
-
-            # reject warped points outside of image
-            #np.clip(xy[:, 0], 0, width, out=xy[:, 0])
-            #np.clip(xy[:, 2], 0, width, out=xy[:, 2])
-            #np.clip(xy[:, 1], 0, height, out=xy[:, 1])
-            #np.clip(xy[:, 3], 0, height, out=xy[:, 3])
-            w = xy[:, 2] - xy[:, 0]
-            h = xy[:, 3] - xy[:, 1]
-            area = w * h
-            ar = np.maximum(w / (h + 1e-16), h / (w + 1e-16))
-            i = (w > 4) & (h > 4) & (area / (area0 + 1e-16) > 0.1) & (ar < 10)
-
-            targets = targets[i]
-            targets[:, 2:6] = xy[i]
-
-        return imw, targets, M
+        targets, M = warp_points(targets, M, a)
+        return imw, targets, M, a
     else:
         return imw
 
+def warp_points(targets, M, a):
+    if len(targets) > 0:
+        n = targets.shape[0]
+        points = targets[:, 2:6].copy()
+        area0 = (points[:, 2] - points[:, 0]) * \
+            (points[:, 3] - points[:, 1])
+
+        # warp points
+        xy = np.ones((n * 4, 3))
+        xy[:, :2] = points[:, [0, 1, 2, 3, 0, 3, 2, 1]].reshape(
+            n * 4, 2)  # x1y1, x2y2, x1y2, x2y1
+        xy = (xy @ M.T)[:, :2].reshape(n, 8)
+
+        # create new boxes
+        x = xy[:, [0, 2, 4, 6]]
+        y = xy[:, [1, 3, 5, 7]]
+        xy = np.concatenate(
+            (x.min(1), y.min(1), x.max(1), y.max(1))).reshape(4, n).T
+
+        # apply angle-based reduction
+        radians = a * math.pi / 180
+        reduction = max(abs(math.sin(radians)),
+                        abs(math.cos(radians))) ** 0.5
+        x = (xy[:, 2] + xy[:, 0]) / 2
+        y = (xy[:, 3] + xy[:, 1]) / 2
+        w = (xy[:, 2] - xy[:, 0]) * reduction
+        h = (xy[:, 3] - xy[:, 1]) * reduction
+        xy = np.concatenate(
+            (x - w / 2, y - h / 2, x + w / 2, y + h / 2)).reshape(4, n).T
+
+        # reject warped points outside of image
+        #np.clip(xy[:, 0], 0, width, out=xy[:, 0])
+        #np.clip(xy[:, 2], 0, width, out=xy[:, 2])
+        #np.clip(xy[:, 1], 0, height, out=xy[:, 1])
+        #np.clip(xy[:, 3], 0, height, out=xy[:, 3])
+        w = xy[:, 2] - xy[:, 0]
+        h = xy[:, 3] - xy[:, 1]
+        area = w * h
+        ar = np.maximum(w / (h + 1e-16), h / (w + 1e-16))
+        i = (w > 4) & (h > 4) & (area / (area0 + 1e-16) > 0.1) & (ar < 10)
+
+        targets = targets[i]
+        targets[:, 2:6] = xy[i]
+
+    return targets, M
 
 def collate_fn(batch):
     imgs, labels, paths, sizes = zip(*batch)
@@ -461,9 +462,60 @@ class JointDataset(LoadImagesAndLabels):  # for training
 
         img_path = self.img_files[ds][files_index - start_index]
         label_path = self.label_files[ds][files_index - start_index]
+        futures_data, pasts_data = None, None
+        if self.forecast:
+            # initialization
+            forecast_future_path = self.forecast_future_files[ds][files_index - start_index]
+            forecast_past_path = self.forecast_past_files[ds][files_index - start_index]
+
+            futures = np.zeros(
+                (self.max_objs, self.future_length, self.output_size), dtype=np.float32)
+            pasts = np.zeros((self.max_objs, self.past_length,
+                              self.input_size), dtype=np.float32)
+            futures_mask = np.zeros(
+                (self.max_objs, self.future_length, self.output_size), dtype=np.uint8)
+            futures_inds = np.zeros((self.max_objs), dtype=np.int64)
+            pasts_mask = np.zeros(
+                (self.max_objs, self.past_length, self.input_size), dtype=np.uint8)
+            pasts_inds = np.zeros((self.max_objs), dtype=np.int64)
+
+            if os.path.exists(forecast_future_path):
+                column_length = (self.future_length) * 4 + 1
+                futures_data, f_mask = load_txt(
+                    forecast_future_path, column_length, max_column=361)
+                inds = futures_data[:, 0]
+                futures_data = futures_data[:, 1:]
+                n = futures_data.shape[-1] // 4
+                f_mask = f_mask[:, 1:].reshape(f_mask.shape[0], n, 4)  # [:,1:,:]
+                futures_data = futures_data.reshape(futures_data.shape[0], n, 4)
+                temp = np.zeros((futures_data.shape[0], n, 6))
+                temp[:,:, 2:] = futures_data
+                temp[:,:, 1] = inds[:, np.newaxis]
+                temp = temp.reshape(-1, 6)
+                futures_data = temp
+
+            if os.path.exists(forecast_past_path):
+                column_length = (self.past_length + 1) * 4 + 1
+                pasts_data, p_mask = load_txt(
+                    forecast_past_path, column_length, max_column=121)
+                inds = pasts_data[:, 0]
+                pasts_data = pasts_data[:, 1:]
+                n = pasts_data.shape[-1] // 4
+                p_mask = p_mask[:, 1:].reshape(p_mask.shape[0], n, 4)[:, 1:, :]
+                pasts_mask[:p_mask.shape[0], :, :4] = p_mask
+                pasts_mask[:p_mask.shape[0], :,  4:] = p_mask
+                pasts_inds[:p_mask.shape[0]] = inds
+
+                pasts_data = pasts_data.reshape(pasts_data.shape[0], n, 4)
+                temp = np.zeros((pasts_data.shape[0], n, 6))
+                temp[:,:, 2:] = pasts_data
+                temp[:,:, 1] = inds[:, np.newaxis]
+                temp = temp.reshape(-1, 6)
+                pasts_data = temp
 
         imgs, labels, img_path, (input_h, input_w) = self.get_data(
-            img_path, label_path)
+            img_path, label_path, futures_data, pasts_data)
+        
         for i, _ in enumerate(labels):
             if labels[i, 1] > -1:
                 labels[i, 1] += self.tid_start_index[ds]
@@ -639,6 +691,149 @@ class JointDataset(LoadImagesAndLabels):  # for training
             ret['pasts_inds'] = pasts_inds
 
         return ret
+
+    def get_data(self, img_path, label_path, futures_data=[], pasts_data=[]):
+        height = self.height
+        width = self.width
+        img = cv2.imread(img_path)  # BGR
+        if img is None:
+            raise ValueError('File corrupt {}'.format(img_path))
+        augment_hsv = True
+        if self.augment and augment_hsv:
+            # SV augmentation by 50%
+            fraction = 0.50
+            img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+            S = img_hsv[:, :, 1].astype(np.float32)
+            V = img_hsv[:, :, 2].astype(np.float32)
+
+            a = (random.random() * 2 - 1) * fraction + 1
+            S *= a
+            if a > 1:
+                np.clip(S, a_min=0, a_max=255, out=S)
+
+            a = (random.random() * 2 - 1) * fraction + 1
+            V *= a
+            if a > 1:
+                np.clip(V, a_min=0, a_max=255, out=V)
+
+            img_hsv[:, :, 1] = S.astype(np.uint8)
+            img_hsv[:, :, 2] = V.astype(np.uint8)
+            cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR, dst=img)
+
+        h, w, _ = img.shape
+        img, ratio, padw, padh = letterbox(img, height=height, width=width)
+        
+        labels = np.array([])
+        labels_f = np.array([])
+        labels_p = np.array([])
+
+        # Load labels
+        if os.path.isfile(label_path):
+            labels0 = np.loadtxt(label_path, dtype=np.float32).reshape(-1, 6)
+
+            # Normalized xywh to pixel xyxy format
+            labels = labels0.copy()
+            labels[:, 2] = ratio * w * \
+                (labels0[:, 2] - labels0[:, 4] / 2) + padw
+            labels[:, 3] = ratio * h * \
+                (labels0[:, 3] - labels0[:, 5] / 2) + padh
+            labels[:, 4] = ratio * w * \
+                (labels0[:, 2] + labels0[:, 4] / 2) + padw
+            labels[:, 5] = ratio * h * \
+                (labels0[:, 3] + labels0[:, 5] / 2) + padh
+        
+
+        # Augment image and labels
+        if self.augment:
+            img, labels, M, a = random_affine(
+                img, labels, degrees=(-5, 5), translate=(0.10, 0.10), scale=(0.50, 1.20))
+
+            if len(futures_data):
+                futures_data[:, [2, 4]] /= w
+                futures_data[:, [3, 5]] /= h
+                # Normalized xywh to pixel xyxy format
+                labels_f = futures_data.copy()
+                labels_f[:, 2] = ratio * w * \
+                    (futures_data[:, 2] - futures_data[:, 4] / 2) + padw
+                labels_f[:, 3] = ratio * h * \
+                    (futures_data[:, 3] - futures_data[:, 5] / 2) + padh
+                labels_f[:, 4] = ratio * w * \
+                    (futures_data[:, 2] + futures_data[:, 4] / 2) + padw
+                labels_f[:, 5] = ratio * h * \
+                    (futures_data[:, 3] + futures_data[:, 5] / 2) + padh
+
+                labels_f = warp_points(labels_f, M, a)
+                # convert xyxy to xywh
+                labels_f[:, 2:6] = xyxy2xywh(labels_f[:, 2:6].copy())  # / height
+                labels_f[:, 2] /= width
+                labels_f[:, 3] /= height
+                labels_f[:, 4] /= width
+                labels_f[:, 5] /= height
+                
+
+            if len(pasts_data):
+                pasts_data[:, [2, 4]] /= w
+                pasts_data[:, [3, 5]] /= h
+
+                # Normalized xywh to pixel xyxy format
+                labels_p = pasts_data.copy()
+                labels_p[:, 2] = ratio * w * \
+                    (pasts_data[:, 2] - pasts_data[:, 4] / 2) + padw
+                labels_p[:, 3] = ratio * h * \
+                    (pasts_data[:, 3] - pasts_data[:, 5] / 2) + padh
+                labels_p[:, 4] = ratio * w * \
+                    (pasts_data[:, 2] + pasts_data[:, 4] / 2) + padw
+                labels_p[:, 5] = ratio * h * \
+                    (pasts_data[:, 3] + pasts_data[:, 5] / 2) + padh
+
+                labels_p = warp_points(labels_p, M, a)
+
+                # convert xyxy to xywh
+                labels_p[:, 2:6] = xyxy2xywh(labels_p[:, 2:6].copy())  # / height
+                labels_p[:, 2] /= width
+                labels_p[:, 3] /= height
+                labels_p[:, 4] /= width
+                labels_p[:, 5] /= height
+
+        plotFlag = False
+        if plotFlag:
+            import matplotlib
+            matplotlib.use('Agg')
+            import matplotlib.pyplot as plt
+            plt.figure(figsize=(50, 50))
+            plt.imshow(img[:, :, ::-1])
+            plt.plot(labels[:, [1, 3, 3, 1, 1]].T,
+                     labels[:, [2, 2, 4, 4, 2]].T, '.-')
+            plt.axis('off')
+            plt.savefig('test.jpg')
+            time.sleep(10)
+
+        nL = len(labels)
+        if nL > 0:
+            # convert xyxy to xywh
+            labels[:, 2:6] = xyxy2xywh(labels[:, 2:6].copy())  # / height
+            labels[:, 2] /= width
+            labels[:, 3] /= height
+            labels[:, 4] /= width
+            labels[:, 5] /= height
+        if self.augment:
+            # random left-right flip
+            lr_flip = True
+            if lr_flip & (random.random() > 0.5):
+                img = np.fliplr(img)
+                if nL > 0:
+                    labels[:, 2] = 1 - labels[:, 2]
+                    if len(futures_data):
+                        labels_f[:, 2] = 1 - labels_f[:,2]
+                    if len(pasts_data):
+                        labels_p[:, 2] = 1 - labels_p[:,2]
+
+        img = np.ascontiguousarray(img[:, :, ::-1])  # BGR to RGB
+
+        if self.transforms is not None:
+            img = self.transforms(img)
+
+        return img, labels, img_path, (h, w)
 
 
 class DetDataset(LoadImagesAndLabels):  # for training

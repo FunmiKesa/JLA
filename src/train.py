@@ -30,7 +30,7 @@ def main(opt):
     f.close()
     transforms = T.Compose([T.ToTensor()])
     dataset = Dataset(opt, dataset_root, trainset_paths,
-                      (1088, 608), augment=False, transforms=transforms)
+                      (1088, 608), augment=True, transforms=transforms)
     opt = opts().update_dataset_info_and_set_heads(opt, dataset)
     print(opt)
 
