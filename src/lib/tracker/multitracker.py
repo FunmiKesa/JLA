@@ -304,7 +304,7 @@ class JDETracker(object):
             bboxes = []
 
             strack_pool = joint_stracks(
-                self.tracked_stracks, self.lost_stracks)
+                self.tracked_stracks, [])
             selected_strack = {}
             pasts = np.zeros(
                 (self.max_per_image, self.past_length, self.input_size), dtype=np.float32)
@@ -431,7 +431,7 @@ class JDETracker(object):
         remain_inds = dets[:, 4] > self.opt.conf_thres
         dets = dets[remain_inds]
         id_feature = id_feature[remain_inds]
-
+        # dets_xywh = xyxy2xywh(dets[...,:4])
         # vis
         '''
         os.environ['DISPLAY'] = 'localhost:13.0'
@@ -580,8 +580,8 @@ class JDETracker(object):
                 forecasts = pred_futures[i]
                 t.forecasts = forecasts
 
-                if viz:
-                    os.environ['DISPLAY'] = 'localhost:11.0'
+                if viz and (self.frame_id % 15 == 0) :
+                    os.environ['DISPLAY'] = 'user-MS-7883:11.0'
                     img = img0.copy()
                     bbox = t.tlbr
                     bbox = [int(v) for v in bbox]
