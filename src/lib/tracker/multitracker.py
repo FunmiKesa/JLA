@@ -389,38 +389,39 @@ class JDETracker(object):
                 # flip back
                 pasts_mask = np.flip(pasts_mask, 1)
                 mask = pasts_mask.max(axis=1)
-                l  = pred_futures.copy()
-                l = xywh2xyxy(l.copy())
-                l = l.transpose((1,0,2))
-                p = np.zeros((60, 500, 6))
-                p[:,:, :4] = l
-                p[:, mask > 0, 4] = 1 
+                # l  = pred_futures.copy()
+                # l = xywh2xyxy(l.copy())
+                # l = l.transpose((1,0,2))
+                # n = mask > 0
+                # p = np.zeros((60, objs_count, 6))
+                # p[:,:, :4] = l[:, :objs_count, :]
+                # p[:,:, 4] = 1 
 
-                p = torch.from_numpy(p)
-                p = self.post_process(p, meta)
-                p = self.merge_outputs([p])[1]
+                # p = torch.from_numpy(p)
+                # p = self.post_process(p, meta)
+                # p = self.merge_outputs([p])[1]
 
-                p = p.reshape(60, -1, 5)
-                p = p.transpose((1,0,2))
-                p = p[..., :4]
-                p_xywh = xyxy2xywh(p)
-                pred_futures = p
+                # p = p.reshape(60, -1, 5)
+                # p = p.transpose((1,0,2))
+                # p = p[..., :4]
+                # # p_xywh = xyxy2xywh(p)
+                # pred_futures = p
 
                 # mask = pasts_mask.max(dim=1)[0]
                 # mask = mask.unsqueeze(1).unsqueeze(2).expand_as(pred_futures).float()
 
                 # pp = pred_futures.clone()
-                # pred_futures[..., [0, 2]] /= output_w
-                # pred_futures[..., [1, 3]] /= output_h
-                # pred_futures[..., [1, 3]] *= inp_height
-                # pred_futures[..., [0, 2]] *= inp_width
-                # pred_futures = xywh2xyxy(pred_futures.copy())
-                # pred_futures[..., [1, 3]] -= dh
-                # pred_futures[..., [0, 2]] -= dw
-                # pred_futures /= ratio
-                # pred_futures = pred_futures * mask[:, np.newaxis, np.newaxis, ]
+                pred_futures[..., [0, 2]] /= output_w
+                pred_futures[..., [1, 3]] /= output_h
+                pred_futures[..., [1, 3]] *= inp_height
+                pred_futures[..., [0, 2]] *= inp_width
+                pred_futures = xywh2xyxy(pred_futures.copy())
+                pred_futures[..., [1, 3]] -= dh
+                pred_futures[..., [0, 2]] -= dw
+                pred_futures /= ratio
+                pred_futures = pred_futures * mask[:, np.newaxis, np.newaxis, ]
 
-                pred_futures_xywh = xyxy2xywh(pred_futures)
+                # pred_futures_xywh = xyxy2xywh(pred_futures)
 
 
                 # self.post_process(xywh2xyxy(pred_futures), meta)
