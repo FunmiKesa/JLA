@@ -281,6 +281,7 @@ class JDETracker(object):
         meta = {'c': c, 's': s,
                 'out_height': inp_height // self.opt.down_ratio,
                 'out_width': inp_width // self.opt.down_ratio}
+        selected_strack = {}
 
         if self.opt.forecast:
             im_blob = [im_blob]
@@ -304,8 +305,7 @@ class JDETracker(object):
             bboxes = []
 
             strack_pool = joint_stracks(
-                self.tracked_stracks, [])
-            selected_strack = {}
+                self.tracked_stracks, self.lost_stracks)
             pasts = np.zeros(
                 (self.max_per_image, self.past_length, self.input_size), dtype=np.float32)
             if len(strack_pool) > 0:
