@@ -10,6 +10,7 @@ import logging
 import motmetrics as mm
 import numpy as np
 import torch
+import sys
 
 from tracker.multitracker import JDETracker
 from tracking_utils import visualization as vis
@@ -142,6 +143,7 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
 def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), exp_name='demo',
          save_images=False, save_videos=False, show_image=True):
     logger.setLevel(logging.INFO)
+    logger.info((str(sys.argv)))
     result_root = os.path.join(data_root, '..', 'results', exp_name)
     mkdir_if_missing(result_root)
     data_type = 'mot'
@@ -160,9 +162,10 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
         output_dir = os.path.join(
             data_root, '..', 'outputs', exp_name, seq) if save_images or save_videos else None
         forecast_dir = os.path.join(
-            opt.forecast_root, seq, 'pred') if opt.forecast else None
+            opt.forecast_root.replace('future', 'pred'), seq, 'img1') if opt.forecast else None
         opt.forecast_dir = forecast_dir
         logger.info('start seq: {}'.format(seq))
+        print(data_root)
         dataloader = datasets.LoadImages(
             osp.join(data_root, seq, 'img1'), opt.img_size)
         result_filename = os.path.join(result_root, '{}.txt'.format(seq))
@@ -363,7 +366,7 @@ if __name__ == '__main__':
     seqs = [seq.strip() for seq in seqs_str.split()]
 
     if opt.forecast:
-        opt.forecast_root = data_root.replace('images', 'labels_with_ids')
+        opt.forecast_root = data_root.replace('images', 'future')
     main(opt,
          data_root=data_root,
          seqs=seqs,

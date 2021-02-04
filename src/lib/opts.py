@@ -143,7 +143,7 @@ class opts(object):
                                  default='../src/lib/cfg/data.json',
                                  help='load data from cfg')
         self.parser.add_argument(
-            '--data_dir', type=str, default='/media2/funmi/MOT')
+            '--data_dir', type=str, default='../data/')
 
         # loss
         self.parser.add_argument('--mse_loss', action='store_true',
