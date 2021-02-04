@@ -392,9 +392,10 @@ class JDETracker(object):
                 l  = pred_futures.copy()
                 l = xywh2xyxy(l.copy())
                 l = l.transpose((1,0,2))
-                p = np.zeros((60, 500, 6))
-                p[:,:, :4] = l
-                p[:, mask > 0, 4] = 1 
+                n = mask > 0
+                p = np.zeros((60, objs_count, 6))
+                p[:,:, :4] = l[:, :objs_count, :]
+                p[:,:, 4] = 1 
 
                 p = torch.from_numpy(p)
                 p = self.post_process(p, meta)
@@ -403,7 +404,7 @@ class JDETracker(object):
                 p = p.reshape(60, -1, 5)
                 p = p.transpose((1,0,2))
                 p = p[..., :4]
-                p_xywh = xyxy2xywh(p)
+                # p_xywh = xyxy2xywh(p)
                 pred_futures = p
 
                 # mask = pasts_mask.max(dim=1)[0]
@@ -420,7 +421,7 @@ class JDETracker(object):
                 # pred_futures /= ratio
                 # pred_futures = pred_futures * mask[:, np.newaxis, np.newaxis, ]
 
-                pred_futures_xywh = xyxy2xywh(pred_futures)
+                # pred_futures_xywh = xyxy2xywh(pred_futures)
 
 
                 # self.post_process(xywh2xyxy(pred_futures), meta)
