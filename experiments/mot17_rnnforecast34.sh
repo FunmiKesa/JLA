@@ -41,11 +41,7 @@ python track.py mot \
 --exp_id 'mot17_rf34_emb_p_10_f_60_aug' \
 --arch 'rnnforecast_34' \
 --load_model '../exp/mot/mot17_rf34_emb_p_10_f_60_aug/model_last.pth' \
---conf_thres '0.6' \
---batch_size '8' \
---gpu '0,1' \
---past_length '10' \
---future_length '60' \
+--conf_thres '0.4' \
 --forecast \
 --val_mot17 \
 --use_embedding
@@ -54,11 +50,7 @@ python track.py mot \
 --exp_id 'mot17_rf34_emb_p_10_f_60_aug' \
 --arch 'rnnforecast_34' \
 --load_model '../exp/mot/mot17_rf34_emb_p_10_f_60_aug/model_last.pth' \
---conf_thres '0.6' \
---batch_size '8' \
---gpu '0,1' \
---past_length '10' \
---future_length '60' \
+--conf_thres '0.4' \
 --forecast \
 --val_mot20 \
 --use_embedding
@@ -68,10 +60,6 @@ python track.py mot \
 --arch 'rnnforecast_34' \
 --load_model '../exp/mot/mot17_rf34_emb_p_10_f_60_aug/model_last.pth' \
 --conf_thres '0.4' \
---batch_size '8' \
---gpu '0,1' \
---past_length '10' \
---future_length '60' \
 --forecast \
 --test_mot17 \
 --use_embedding
