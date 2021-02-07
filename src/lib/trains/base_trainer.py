@@ -7,7 +7,7 @@ import torch
 from progress.bar import Bar
 from models.data_parallel import DataParallel
 from utils.utils import AverageMeter
-
+from torch.nn.parallel import DistributedDataParallel
 
 class ModelWithLoss(torch.nn.Module):
   def __init__(self, model, loss):
@@ -34,6 +34,7 @@ class BaseTrainer(object):
       self.model_with_loss = DataParallel(
         self.model_with_loss, device_ids=gpus, 
         chunk_sizes=chunk_sizes).to(device)
+      # self.model_with_loss = DistributedDataParallel(self.model_with_loss, device_ids=[i], output_device=i)
     else:
       self.model_with_loss = self.model_with_loss.to(device)
     

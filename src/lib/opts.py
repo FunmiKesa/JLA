@@ -28,7 +28,7 @@ class opts(object):
         # system
         self.parser.add_argument('--gpus', default='0, 1',
                                  help='-1 for CPU, use comma for multiple gpus')
-        self.parser.add_argument('--num_workers', type=int, default=8,
+        self.parser.add_argument('--num_workers', type=int, default=16,
                                  help='dataloader threads. 0 for single-thread.')
         self.parser.add_argument('--not_cuda_benchmark', action='store_true',
                                  help='disable when the input size is not fixed.')
@@ -190,7 +190,20 @@ class opts(object):
             '--future_length', type=int, default=60, help='Number of future frames forecast')
         self.parser.add_argument(
             '--hidden_size', type=int, default=512, help='Size of the RNN hidden layer')
-
+        self.parser.add_argument('--multiprocessing_distributed', action='store_true',
+                    help='Use multi-processing distributed training to launch '
+                         'N processes per node, which has N GPUs. This is the '
+                         'fastest way to use PyTorch for either single node or '
+                         'multi node data parallel training')
+        self.parser.add_argument('--world-size', default=-1, type=int,
+                    help='number of nodes for distributed training')
+        self.parser.add_argument('--rank', default=-1, type=int,
+                    help='node rank for distributed training')
+        self.parser.add_argument('--dist-url', default='tcp://127.0.0.1:5555', type=str,
+                            help='url used to set up distributed training')
+        self.parser.add_argument('--dist-backend', default='nccl', type=str,
+                            help='distributed backend')
+        
     def parse(self, args=''):
         if args == '':
             opt = self.parser.parse_args()
