@@ -119,8 +119,8 @@ if __name__ == "__main__":
                                  img_size=img_size)
 
             elif 'Caltech' in d:
-                seq_root = f'data/{d}/data/images'
-                label_root = f'data/{d}/data/labels_with_ids'
+                seq_root = f'data/{d}/images'
+                label_root = f'data/{d}/labels_with_ids'
 
                 cv_label_root = label_root.replace(
                     'labels_with_ids', cv_label)

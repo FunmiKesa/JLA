@@ -489,20 +489,19 @@ class DLASeg(nn.Module):
         return [z]
 
 
-def get_pose_net(num_layers, heads, head_conv=256, down_ratio=4, forecast=None, device='cuda'):
+def get_pose_net(num_layers, heads, head_conv=256, down_ratio=4):
     model = RNNForecast('dla{}'.format(num_layers), heads,
                         pretrained=True,
                         down_ratio=down_ratio,
                         final_kernel=1,
                         last_level=5,
-                        head_conv=head_conv, forecast=forecast, device=device
-                        )
+                        head_conv=head_conv)
     return model
 
 
 class RNNForecast(nn.Module):
     def __init__(self, base_name, heads, pretrained, down_ratio, final_kernel,
-                 last_level, head_conv, out_channel=0, forecast=None, device='cuda'):
+                 last_level, head_conv, out_channel=0):
         super(RNNForecast, self).__init__()
 
         assert down_ratio in [2, 4, 8, 16]
@@ -519,14 +518,19 @@ class RNNForecast(nn.Module):
 
         self.ida_up = IDAUp(out_channel, channels[self.first_level:self.last_level],
                             [2 ** i for i in range(self.last_level - self.first_level)])
-        self.forecast = forecast
-        if self.forecast:
+
+        if 'fct' in heads:
+            forecast = heads['fct']
             input_size = forecast['input_size']
             hidden_size = forecast['hidden_size']
             output_size = forecast['output_size']
             future_length = forecast['future_length']
+            emb_size = forecast['emb_size']
 
-            self.rnn = ForeCastRNN(device, input_size, output_size, future_length, hidden_size, 'fct' in heads )
+            self.rnn = ForeCastRNN(input_size, output_size, future_length, hidden_size, use_embedding=emb_size > 1)
+
+            self.forecast = forecast
+            heads['fct'] = emb_size
             
         self.heads = heads
         for head in self.heads:
@@ -554,7 +558,6 @@ class RNNForecast(nn.Module):
             self.__setattr__(head, fc)
 
             self.emb_dim = self.heads['id']
-            self.device = device
 
     def forward(self, x):
         if self.forecast:

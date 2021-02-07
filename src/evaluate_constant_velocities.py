@@ -61,10 +61,7 @@ if __name__ == "__main__":
                     i += 1
                                
             else:
-                if 'Caltech' in d:
-                    label_root = f'data/{d}/data/future'
-                else:
-                    label_root = f'data/{d}/future'
+                label_root = f'data/{d}/future'
                 
                 if not osp.exists(label_root) | osp.exists(filename):
                     continue

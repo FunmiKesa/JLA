@@ -3,16 +3,15 @@ import torch.nn as nn
 
 
 class EncoderRNN(nn.Module):
-    def __init__(self, device, input_size, num_hidden):
+    def __init__(self, input_size, num_hidden):
         super(EncoderRNN, self).__init__()
         self.num_hidden = num_hidden
         self.input_size = input_size
         self.encoder1 = nn.GRUCell(input_size, self.num_hidden)
-        self.device = device
 
     def forward(self, input):
         context = torch.tensor(torch.zeros(input.size(
-            0), self.num_hidden, dtype=torch.float), device=self.device)
+            0), self.num_hidden, dtype=torch.float), device=input.device)
 
         forecast_sequence = input.size()[1]
         for i in range(forecast_sequence):
@@ -22,13 +21,12 @@ class EncoderRNN(nn.Module):
 
 
 class DecoderRNN(nn.Module):
-    def __init__(self, device, input_size, output_size, num_hidden, use_embedding=False):
+    def __init__(self, input_size, output_size, num_hidden, use_embedding=False):
         super(DecoderRNN, self).__init__()
         self.num_hidden = num_hidden
         self.input_size = input_size
         self.output_size = output_size
         self.use_embedding = use_embedding
-        self.device = device
         self.decoder1 = nn.GRUCell(int(self.num_hidden/2), self.num_hidden)
         h = self.num_hidden if use_embedding else self.num_hidden // 2
         self.decoder2 = nn.GRUCell(h, self.num_hidden)
@@ -86,18 +84,16 @@ class Cumsum(nn.Module):
 
 
 class ForeCastRNN(nn.Module):
-    def __init__(self, device, input_size, output_size, future_length, num_hidden, use_embedding=False):
+    def __init__(self, input_size, output_size, future_length, num_hidden, use_embedding=False):
         super(ForeCastRNN, self).__init__()
-        self.device = device
         self.num_hidden = num_hidden
         self.input_size = input_size
         self.output_size = output_size
         self.future_length = future_length
         self.use_embedding = use_embedding
-        self.encoder = EncoderRNN(
-            self.device, self.input_size, self.num_hidden)
+        self.encoder = EncoderRNN(self.input_size, self.num_hidden)
         self.decoder = DecoderRNN(
-            self.device, input_size, output_size, self.num_hidden, self.use_embedding)
+            input_size, output_size, self.num_hidden, self.use_embedding)
 
         self.final = Cumsum()
 

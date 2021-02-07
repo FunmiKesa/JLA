@@ -272,8 +272,11 @@ class opts(object):
             opt.img_size = (1088, 608)
             #opt.img_size = (864, 480)
             #opt.img_size = (576, 320)
-            if opt.forecast and opt.use_embedding:
-                opt.heads.update({'fct': 256})
+            if opt.forecast:
+                emb_size = 256 if opt.use_embedding else 1
+                opt.forecast.update({'emb_size': emb_size})
+                opt.heads.update({'fct': opt.forecast})
+            
         else:
             assert 0, 'task not defined!'
         print('heads', opt.heads)

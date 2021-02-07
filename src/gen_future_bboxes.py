@@ -118,8 +118,8 @@ if __name__ == "__main__":
                                      future_length, img_size)
 
             elif 'Caltech' in d:
-                seq_root = f'data/{d}/data/images'
-                label_root = f'data/{d}/data/labels_with_ids'
+                seq_root = f'data/{d}/images'
+                label_root = f'data/{d}/labels_with_ids'
                 img_size = (480, 640)
 
                 future_label_root = label_root.replace(
