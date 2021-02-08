@@ -17,7 +17,7 @@ import motmetrics as mm
 mm.lap.default_solver = 'lap'
 
 
-def eval_seq(gt_label_root, pred_length=30, gt_folder='future', pred_folder='pred'):
+def eval_seq(gt_label_root, pred_length=30, gt_folder='future', pred_folder='pred', fixed_length=False):
     bboxes1 = []
     bboxes2 = []
     pred_label_root = gt_label_root.replace(gt_folder, pred_folder)
@@ -69,8 +69,21 @@ def eval_seq(gt_label_root, pred_length=30, gt_folder='future', pred_folder='pre
         mask2 = mask2[match_js]
 
         mask = mask1 & mask2
+            
         bbox1 *= mask
         bbox2 *= mask
+
+        if fixed_length:
+            # Quick check
+            obj_filter = mask.min(axis=(1,2)) > 0
+            bbox1 = bbox1[obj_filter]
+            bbox2 = bbox2[obj_filter]
+
+            # or
+            # total = pred_length * 4
+            # obj_filter = mask.sum(axis=(1,2)) == total
+            # bbox1 = bbox1[obj_filter]
+            # bbox2 = bbox2[obj_filter]
 
         bboxes1 += [bbox1]
         bboxes2 += [bbox2]

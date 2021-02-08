@@ -180,6 +180,8 @@ class opts(object):
                                  help='category specific bounding box size.')
         self.parser.add_argument('--not_reg_offset', action='store_true',
                                  help='not regress local offset.')
+
+        # forecast
         self.parser.add_argument('--forecast', action='store_true',
                                  help='forecast bounding location')
         self.parser.add_argument('--use_embedding', action='store_true',
@@ -190,6 +192,10 @@ class opts(object):
             '--future_length', type=int, default=60, help='Number of future frames forecast')
         self.parser.add_argument(
             '--hidden_size', type=int, default=512, help='Size of the RNN hidden layer')
+        self.parser.add_argument(
+            '--fixed_length', action='store_true', help='used fixed length of past and future bounding boxes')
+
+        # distributed
         self.parser.add_argument('--multiprocessing_distributed', action='store_true',
                     help='Use multi-processing distributed training to launch '
                          'N processes per node, which has N GPUs. This is the '
@@ -226,7 +232,8 @@ class opts(object):
                 'past_length': opt.past_length,
                 'hidden_size': opt.hidden_size,
                 'input_size': 8,
-                'output_size': 4
+                'output_size': 4,
+                'fixed_length': opt.fixed_length,
             }
 
         if opt.head_conv == -1:  # init default head_conv

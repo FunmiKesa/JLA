@@ -390,6 +390,7 @@ class JointDataset(LoadImagesAndLabels):  # for training
         if self.forecast:
             self.past_length = self.forecast['past_length']
             self.future_length = self.forecast['future_length']
+            self.fixed_length = self.forecast['fixed_length']
             self.hidden_size = self.forecast['hidden_size']
             self.input_size = self.forecast['input_size']
             self.output_size = self.forecast['output_size']
@@ -508,6 +509,9 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 pasts_data, p_mask = load_txt(
                     forecast_past_path, column_length, max_column=121)
                 pasts_data, p_mask = self.six_dim(pasts_data, p_mask)
+
+            if self.fixed_length:
+                print(p_mask.shape)
 
         imgs, labels, img_path, (input_h, input_w), (f_data, f_data_mask), (p_data, p_data_mask) = self.get_data(
             img_path, label_path, futures_data, pasts_data)
