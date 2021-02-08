@@ -50,9 +50,10 @@ def main():
         # Use torch.multiprocessing.spawn to launch distributed processes: the
         # main_worker process function
         mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, opt))
-    else:
-        # Simply call main_worker function
-        main_worker(opt.gpu, ngpus_per_node, opt)
+    # else:
+    #     # Simply call main_worker function
+        
+    #     main_worker(opt.gpus, ngpus_per_node, opt)
 
 
 def main_worker(gpu, ngpus_per_node, opt):
@@ -104,22 +105,22 @@ def main_worker(gpu, ngpus_per_node, opt):
             # ourselves based on the total number of GPUs we have
             opt.batch_size = int(opt.batch_size / ngpus_per_node)
             opt.num_workers = int((opt.num_workers + ngpus_per_node - 1) / ngpus_per_node)
-            model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[opt.gpu], find_unused_parameters=True)
+            # model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[opt.gpu], find_unused_parameters=True)
         else:
             model.cuda()
             # DistributedDataParallel will divide and allocate batch_size to all
             # available GPUs if device_ids are not set
-            model = torch.nn.parallel.DistributedDataParallel(model)
-    elif opt.gpu is not None:
-        torch.cuda.set_device(opt.gpu)
-        model = model.cuda(opt.gpu)
-    else:
-        # DataParallel will divide and allocate batch_size to all available GPUs
-        if opt.arch.startswith('alexnet') or opt.arch.startswith('vgg'):
-            model.features = torch.nn.DataParallel(model.features)
-            model.cuda()
-        else:
-            model = torch.nn.DataParallel(model).cuda()
+            # model = torch.nn.parallel.DistributedDataParallel(model)
+    # elif opt.gpu is not None:
+    #     torch.cuda.set_device(opt.gpu)
+    #     model = model.cuda(opt.gpu)
+    # else:
+    #     # DataParallel will divide and allocate batch_size to all available GPUs
+    #     if opt.arch.startswith('alexnet') or opt.arch.startswith('vgg'):
+    #         model.features = torch.nn.DataParallel(model.features)
+    #         model.cuda()
+    #     else:
+    #         model = torch.nn.DataParallel(model).cuda()
     
     # Get dataloader
 
@@ -140,6 +141,7 @@ def main_worker(gpu, ngpus_per_node, opt):
     if opt.load_model != '':
         model, optimizer, start_epoch = load_model(
             model, opt.load_model, trainer.optimizer, opt.resume, opt.lr, opt.lr_step)
+
 
     for epoch in range(start_epoch + 1, opt.num_epochs + 1):
         if opt.distributed:

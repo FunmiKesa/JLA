@@ -35,6 +35,9 @@ class BaseTrainer(object):
         self.model_with_loss, device_ids=gpus, 
         chunk_sizes=chunk_sizes).to(device)
       # self.model_with_loss = DistributedDataParallel(self.model_with_loss, device_ids=[i], output_device=i)
+    elif self.opt.multiprocessing_distributed:
+      self.model_with_loss.to(device)
+      self.model_with_loss = torch.nn.parallel.DistributedDataParallel(self.model_with_loss, device_ids=gpus, find_unused_parameters=True)
     else:
       self.model_with_loss = self.model_with_loss.to(device)
     

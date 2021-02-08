@@ -24,34 +24,15 @@ cd src
 # --forecast \
 # --val_mot17 
 
-python train.py mot \
---exp_id 'optim_mot_17_seed' \
---arch 'rnnforecast_34' \
---load_model '../models/ctdet_coco_dla_2x.pth' \
---data_cfg '../src/lib/cfg/mot17.json' \
---batch_size '16' \
---num_workers '16' \
---gpus '0,1,2,3' \
---num_epochs '60' \
---forecast \
---use_embedding \
---multiprocessing_distributed \
---dist-url tcp://127.0.0.1:5565 \
---dist-backend 'nccl' \
---world-size '1' \
---rank '0' 
-
 # python train.py mot \
 # --exp_id 'optim_mot_17_seed' \
 # --arch 'rnnforecast_34' \
-# --load_model '../exp/mot/optim_mot_17_seed/model_last.pth' \
+# --load_model '../models/ctdet_coco_dla_2x.pth' \
 # --data_cfg '../src/lib/cfg/mot17.json' \
 # --batch_size '16' \
-# --gpus '0,1,2,3' \
 # --num_workers '16' \
-# --num_epochs '31' \
-# --past_length '10' \
-# --future_length '60' \
+# --gpus '0,1,2,3' \
+# --num_epochs '60' \
 # --forecast \
 # --use_embedding \
 # --multiprocessing_distributed \
@@ -59,7 +40,26 @@ python train.py mot \
 # --dist-backend 'nccl' \
 # --world-size '1' \
 # --rank '0' \
-# --resume
+
+python train.py mot \
+--exp_id 'optim_mot_17_seed' \
+--arch 'rnnforecast_34' \
+--load_model '../exp/mot/optim_mot_17_seed/model_last.pth' \
+--data_cfg '../src/lib/cfg/mot17.json' \
+--batch_size '16' \
+--gpus '0,1,2,3' \
+--num_workers '16' \
+--num_epochs '60' \
+--past_length '10' \
+--future_length '60' \
+--forecast \
+--use_embedding \
+--multiprocessing_distributed \
+--dist-url tcp://127.0.0.1:5565 \
+--dist-backend 'nccl' \
+--world-size '1' \
+--rank '0' \
+--resume
 
 python track.py mot \
 --exp_id 'optim_mot_17_seed' \
