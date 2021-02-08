@@ -9,8 +9,8 @@ import sys
 import torch
 USE_TENSORBOARD = True
 try:
-  from torch.utils.tensorboard import SummaryWriter
-  # import tensorboardX
+  # from torch.utils.tensorboard import SummaryWriter
+  from tensorboardX import SummaryWriter
   print('Using tensorboardX')
 except:
   USE_TENSORBOARD = False

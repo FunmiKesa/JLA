@@ -519,6 +519,7 @@ class RNNForecast(nn.Module):
         self.ida_up = IDAUp(out_channel, channels[self.first_level:self.last_level],
                             [2 ** i for i in range(self.last_level - self.first_level)])
         heads = dict(heads)
+        self.forecast = None
         if 'fct' in heads:
             forecast = heads['fct']
             input_size = forecast['input_size']

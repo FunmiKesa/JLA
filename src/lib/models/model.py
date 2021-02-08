@@ -91,6 +91,10 @@ def load_model(model, model_path, optimizer=None, resume=False,
 def save_model(path, epoch, model, optimizer=None):
   if isinstance(model, torch.nn.DataParallel):
     state_dict = model.module.state_dict()
+  elif isinstance(model, torch.nn.parallel.DistributedDataParallel):
+    if torch.distributed.get_rank() != 0:
+      return
+    state_dict = model.module.state_dict()
   else:
     state_dict = model.state_dict()
   data = {'epoch': epoch,

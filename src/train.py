@@ -24,20 +24,20 @@ from logger import Logger
 def main():
     opt = opts().parse()
     print(opt)
-    logger = Logger(opt)
+    # logger = Logger(opt)
     torch.manual_seed(opt.seed)
     torch.backends.cudnn.benchmark = not opt.not_cuda_benchmark and not opt.test
-    torch.backends.cudnn.deterministic = True
+    # torch.backends.cudnn.deterministic = True
     
-    logger.write('You have chosen to seed training. '
-                      'This will turn on the CUDNN deterministic setting, '
-                      'which can slow down your training considerably! '
-                      'You may see unexpected behavior when restarting '
-                      'from checkpoints.')
-
+    # logger.write('You have chosen to seed training. '
+    #                   'This will turn on the CUDNN deterministic setting, '
+    #                   'which can slow down your training considerably! '
+    #                   'You may see unexpected behavior when restarting '
+    #                   'from checkpoints.')
+    
     
     os.environ['CUDA_VISIBLE_DEVICES'] = opt.gpus_str
-    os.environ['NCCL_DEBUG'] ='INFO'
+    # os.environ['NCCL_DEBUG'] ='INFO'
     opt.device = torch.device('cuda' if opt.gpus[0] >= 0 else 'cpu')
 
     opt.distributed = opt.world_size > 1 or opt.multiprocessing_distributed
@@ -59,7 +59,6 @@ def main_worker(gpu, ngpus_per_node, opt):
     opt.gpu = gpu
     logger = Logger(opt)
 
-    logger.write("Testing logger in gpu")    
     if opt.gpu is not None:
         print("Use GPU: {} for training".format(opt.gpu))
 
@@ -123,7 +122,6 @@ def main_worker(gpu, ngpus_per_node, opt):
             model = torch.nn.DataParallel(model).cuda()
     
     # Get dataloader
-    
 
     if opt.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(dataset)
@@ -145,7 +143,7 @@ def main_worker(gpu, ngpus_per_node, opt):
 
     for epoch in range(start_epoch + 1, opt.num_epochs + 1):
         if opt.distributed:
-            train_sampler.set_epoch(epoch)
+            train_sampler.set_epoch(epoch * opt.seed) # set this to a larger seed
         mark = epoch if opt.save_all else 'last'
         log_dict_train, _ = trainer.train(epoch, train_loader)
         logger.write('epoch: {} |'.format(epoch))
