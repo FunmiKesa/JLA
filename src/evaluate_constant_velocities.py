@@ -8,10 +8,11 @@ def mkdirs(d):
         os.makedirs(d)
 
 if __name__ == "__main__":
-    datasets = ["PRW", "Caltech", "MOT15", "MOT16", "MOT17", "MOT20"]
+    datasets = ["MOT15", "MOT16", "MOT17", "MOT20","PRW", "Caltech", ]
     cv_label = 'cv_10'
     pred_length = 60
     gt_folder = 'future'
+    fixed_length = True
 
     for d in datasets:
         filename = f'data/{d}/results/{cv_label}_{pred_length}.csv'
@@ -41,7 +42,7 @@ if __name__ == "__main__":
                     seq_label_root = osp.join(label_root, seq, seq_label)
 
                     aiou, fiou, ade, fde = eval_seq(
-                                seq_label_root, pred_length, gt_folder, cv_label)
+                                seq_label_root, pred_length, gt_folder, cv_label, fixed_length)
                     aious.append(aiou)
                     fious.append(fiou)
                     ades.append(ade)
@@ -67,7 +68,7 @@ if __name__ == "__main__":
                     continue
 
                 aiou, fiou, ade, fde = eval_seq(
-                            label_root, pred_length, gt_folder, cv_label)
+                            label_root, pred_length, gt_folder, cv_label, fixed_length)
                 aious.append(aiou)
                 fious.append(fiou)
                 ades.append(ade)
@@ -78,9 +79,7 @@ if __name__ == "__main__":
                 print('FIOU: ', round(fiou, 1))
                 print('ADE:  ', round(ade, 1))
                 print('FDE:  ', round(fde, 1))
-                seqs = ['caltech']
-
-            
+                seqs = [d]
 
                 if filename:
                     save_result(filename, [aious, fious, ades, fdes],

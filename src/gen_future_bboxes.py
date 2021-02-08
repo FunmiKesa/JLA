@@ -82,7 +82,8 @@ def gen_future_files(seq_label_root, future_label_root, future_length=60, img_si
 
 
 if __name__ == "__main__":
-    datasets = ["PRW", "Caltech", "MOT15", "MOT16", "MOT17", "MOT20"]
+    datasets = ["CityWalks"]
+    # datasets = ["CityWalks", "PRW", "Caltech", "MOT15", "MOT16", "MOT17", "MOT20"]
     future_label = 'future'
     future_length = 60
     for d in datasets:
@@ -116,6 +117,27 @@ if __name__ == "__main__":
 
                     gen_future_files(seq_label_root, future_label_root,
                                      future_length, img_size)
+            elif 'CityWalks' in d:
+                seq_root = f'data/{d}/images'
+                root = f'data/{d}/labels_with_ids'
+                img_size = (720, 1280)
+
+                parent_seqs = sorted(os.listdir(root))
+                for p_seq in parent_seqs:
+                    print(p_seq)
+                    p_label_root = osp.join(root, p_seq)
+
+                    seqs = sorted(os.listdir(p_label_root))
+                    for seq in seqs:
+                        print(seq)
+                        
+
+                        seq_label_root = osp.join(p_label_root, seq)
+                        future_label_root = seq_label_root.replace(
+                            'labels_with_ids', future_label)
+
+                        gen_future_files(seq_label_root, future_label_root,
+                                        future_length, img_size)
 
             elif 'Caltech' in d:
                 seq_root = f'data/{d}/images'
