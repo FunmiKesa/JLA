@@ -584,6 +584,8 @@ class RNNForecast(nn.Module):
                 K = 500
                 f, _ = torch.topk(f.view(batch, cat, -1), K)
                 f =  f.permute(0, 2, 1).contiguous().view(-1, cat).contiguous()
+            if len(prev.size()) > 3:
+                prev = prev.reshape(-1, prev.size(-2), prev.size(-1)).contiguous()
             z['fct'] = self.rnn(prev, f)
         
         output = [z]

@@ -75,11 +75,11 @@ class BaseTrainer(object):
       if opt.forecast:
         input = [batch['input']]
         pasts = batch['pasts']
-        pasts = pasts.view(-1, pasts.shape[-2], pasts.shape[-1]).contiguous()
+        # pasts = pasts.view(-1, pasts.shape[-2], pasts.shape[-1]).contiguous()
         input += [pasts]
         batch['input'] = input
         futures = batch['futures']
-        futures = futures.view(-1, futures.shape[-2], futures.shape[-1]).contiguous()
+        # futures = futures.view(-1, futures.shape[-2], futures.shape[-1]).contiguous()
         batch['futures'] = futures
 
 

@@ -10,8 +10,8 @@ class EncoderRNN(nn.Module):
         self.encoder1 = nn.GRUCell(input_size, self.num_hidden)
 
     def forward(self, input):
-        context = torch.tensor(torch.zeros(input.size(
-            0), self.num_hidden, dtype=torch.float), device=input.device)
+        context = torch.zeros(input.size(
+            0), self.num_hidden, dtype=torch.float, device=input.device)
 
         forecast_sequence = input.size()[1]
         for i in range(forecast_sequence):

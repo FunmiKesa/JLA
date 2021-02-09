@@ -82,6 +82,9 @@ class MotLoss(torch.nn.Module):
                     pasts_mask = pasts_mask.view(-1, pasts_mask.size(
                         2), pasts_mask.size(3)).contiguous().float()
 
+                    pasts = pasts.view(-1, pasts.size(
+                        2), pasts.size(3)).contiguous().float()
+
                     pred_pasts = pred_pasts * pasts_mask
                     pasts = pasts * pasts_mask
 
@@ -96,6 +99,8 @@ class MotLoss(torch.nn.Module):
 
                     futures_mask = futures_mask.view(-1, futures_mask.size(
                         2), futures_mask.size(3)).contiguous().float()
+                    futures = futures.view(-1, futures.size(
+                        2), futures.size(3)).contiguous().float()
 
                     pred_futures = pred_futures * futures_mask
                     futures = futures * futures_mask
