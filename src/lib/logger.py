@@ -38,8 +38,9 @@ class Logger(object):
       for k, v in sorted(args.items()):
         opt_file.write('  %s: %s\n' % (str(k), str(v)))
           
-    log_dir = opt.save_dir + '/logs_{}'.format(time_str)
+    log_dir = opt.save_dir + '/logs_{}_{}'.format(opt.gpus[0], time_str)
     if USE_TENSORBOARD:
+      os.makedirs(log_dir, exist_ok=True)
       self.writer = SummaryWriter(log_dir=log_dir)
     else:
       if not os.path.exists(os.path.dirname(log_dir)):
