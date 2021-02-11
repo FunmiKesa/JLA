@@ -89,7 +89,7 @@ class MotLoss(torch.nn.Module):
                     pasts = pasts * pasts_mask
 
                     pasts_loss = pasts_loss + \
-                        F.l1_loss(pred_pasts, pasts, size_average=False) / \
+                        F.l1_loss(pred_pasts, pasts, reduction='sum') / \
                         (pasts_mask.sum() + 1e-4) / opt.num_stacks
 
                 if opt.futures_weight:
@@ -105,7 +105,7 @@ class MotLoss(torch.nn.Module):
                     pred_futures = pred_futures * futures_mask
                     futures = futures * futures_mask
 
-                    futures_loss = futures_loss + F.l1_loss(pred_futures, futures, size_average=False) / (
+                    futures_loss = futures_loss + F.l1_loss(pred_futures, futures, reduction='sum') / (
                         futures_mask.sum() + 1e-4) / opt.num_stacks
 
         fct_loss = opt.pasts_weight * pasts_loss + opt.futures_weight * futures_loss
