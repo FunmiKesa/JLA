@@ -48,7 +48,7 @@ def extract_frames(video_path, frames_dir, overwrite=False, start=-1, end=-1, ev
     frames_dir = os.path.normpath(frames_dir)  # make the paths OS (Windows) compatible
 
     video_dir, video_filename = os.path.split(video_path)  # get the video path and filename from the path
-    video_filename = video_filename.replace(".mp4", "")
+    video_filename = video_filename.split('.')[0]
     assert os.path.exists(video_path)  # assert the video file exists
 
     capture = cv2.VideoCapture(video_path)  # open the video using OpenCV
@@ -104,18 +104,22 @@ def video_to_frames(video_path, frames_dir, overwrite=False, every=1, chunk_size
     frames_dir = os.path.normpath(frames_dir)  # make the paths OS (Windows) compatible
 
     video_dir, video_filename = os.path.split(video_path)  # get the video path and filename from the path
-    video_filename = video_filename.replace(".mp4", "")
+    video_filename = video_filename.split('.')[0]
 
     # make directory to save frames, its a sub dir in the frames_dir with the video name
     os.makedirs(os.path.join(frames_dir, video_filename), exist_ok=True)
 
     capture = cv2.VideoCapture(video_path)  # load the video
     total = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))  # get its total frame count
-    capture.release()  # release the capture straight away
+    
+    print(video_path)
 
     if total < 1:  # if video has no frames, might be and opencv error
-        print("Video has no frames. Check your OpenCV + ffmpeg installation")
-        return None  # return None
+        if capture.get(cv2.CAP_PROP_FRAME_WIDTH) < 0:
+
+            print("Video has no frames. Check your OpenCV + ffmpeg installation")
+            return None  # return None
+        total = 3000
 
     frame_chunks = [[i, i+chunk_size] for i in range(0, total, chunk_size)]  # split the frames into chunk lists
     frame_chunks[-1][-1] = min(frame_chunks[-1][-1], total-1)  # make sure last chunk has correct end frame, also handles case chunk_size < total
@@ -158,14 +162,15 @@ def vid(folder):
 
 
 if __name__ == "__main__":
-    root = "./data/CityWalks/"
+    root = "./data/CityWalks/clips"
+    # root = "./data/Caltech/data"
     image_root = ""
-    seqs = sorted(os.listdir(root + "clips"))
+    seqs = sorted(os.listdir(root))
     print(seqs)
     # seqs =  ['WROCLAW',]
     for seq in seqs:
         print(seq)
-        folder = os.path.join(root, "clips", seq)
+        folder = os.path.join(root, seq)
 
         vid(folder)
 
