@@ -54,8 +54,8 @@ class BaseTrainer(object):
       if len(self.opt.gpus) > 1:
         model_with_loss = self.model_with_loss.module
       model_with_loss.eval()
-      torch.cuda.empty_cache()
-    torch.autograd.set_detect_anomaly(True)
+      # torch.cuda.empty_cache()
+    # torch.autograd.set_detect_anomaly(True)
     opt = self.opt
     results = {}
     data_time, batch_time = AverageMeter(), AverageMeter()
@@ -74,14 +74,8 @@ class BaseTrainer(object):
           batch[k] = batch[k].to(device=opt.device, non_blocking=True)
       if opt.forecast:
         input = [batch['input']]
-        pasts = batch['pasts']
-        # pasts = pasts.view(-1, pasts.shape[-2], pasts.shape[-1]).contiguous()
-        input += [pasts]
+        input += [batch['pasts']]
         batch['input'] = input
-        futures = batch['futures']
-        # futures = futures.view(-1, futures.shape[-2], futures.shape[-1]).contiguous()
-        batch['futures'] = futures
-
 
       output, loss, loss_stats = model_with_loss(batch)
       loss = loss.mean()
@@ -91,8 +85,6 @@ class BaseTrainer(object):
         self.optimizer.step()
       batch_time.update(time.time() - end)
       end = time.time()
-
-      
 
       Bar.suffix = '{phase}: [{0}][{1}/{2}]|Tot: {total:} |ETA: {eta:} '.format(
         epoch, iter_id, num_iters, phase=phase,
