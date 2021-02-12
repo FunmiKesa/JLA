@@ -253,7 +253,7 @@ if __name__ == '__main__':
     main(opt,
          data_root=data_root,
          seqs=seqs,
-         exp_name='MOT17_val_jde_half_dla34_det',
+         exp_name=opt.exp_id,
          show_image=False,
          save_images=False,
          save_videos=False)
