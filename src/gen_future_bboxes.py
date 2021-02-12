@@ -96,7 +96,7 @@ if __name__ == "__main__":
                 seq_root = f'data/{d}/images/train'
                 label_root = f'data/{d}/labels_with_ids/train'
 
-                seqs = [s for s in os.listdir(seq_root)]
+                seqs = os.listdir(label_root)
                 for seq in seqs:
                     print(seq)
                     img_size = None

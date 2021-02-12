@@ -139,20 +139,6 @@ def main_worker(gpu, ngpus_per_node, opt):
             model, opt.load_model, trainer.optimizer, opt.resume, opt.lr, opt.lr_step)
 
     for epoch in range(start_epoch + 1, opt.num_epochs + 1):
-        if epoch % 5 == 0:
-            if not opt.multiprocessing_distributed or (opt.multiprocessing_distributed and opt.rank % ngpus_per_node == 0):
-                cmd = ["python", "./track.py",
-                       "mot",
-                       "--arch", "rnnforecast_34",
-                       "--exp_id", f"val_{epoch}",
-                       "--load_model", os.path.join(opt.save_dir,
-                                                    f'model_last.pth'),
-                       "--conf_thres", "0.4",
-                       "--val_mot17",
-                       "--forecast",
-                       "--use_embedding"
-                       ]
-                subprocess.run(cmd)
         if opt.distributed:
             # set this to a larger seed
             train_sampler.set_epoch(epoch * opt.seed)
@@ -183,6 +169,20 @@ def main_worker(gpu, ngpus_per_node, opt):
 
             # save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(epoch)),
                 #    epoch, model, optimizer)
+        # if epoch % 5 == 0:
+        #     if not opt.multiprocessing_distributed or (opt.multiprocessing_distributed and opt.rank % ngpus_per_node == 0):
+        #         cmd = ["python", "./track.py",
+        #                "mot",
+        #                "--arch", "rnnforecast_34",
+        #                "--exp_id", f"val_{epoch}",
+        #                "--load_model", os.path.join(opt.save_dir,
+        #                                             f'model_last.pth'),
+        #                "--conf_thres", "0.4",
+        #                "--val_mot17",
+        #                "--forecast",
+        #                "--use_embedding"
+        #                ]
+        #         subprocess.run(cmd)
     log.close()
 
 
