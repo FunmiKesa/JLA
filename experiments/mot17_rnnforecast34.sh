@@ -29,10 +29,10 @@ cd src
 # --arch 'rnnforecast_34' \
 # --load_model '../models/ctdet_coco_dla_2x.pth' \
 # --data_cfg '../src/lib/cfg/mot17.json' \
-# --batch_size '16' \
-# --num_workers '16' \
-# --gpus '0,1,2,3' \
-# --num_epochs '60' \
+# --batch_size '8' \
+# --num_workers '8' \
+# --gpus '0,1' \
+# --num_epochs '30' \
 # --forecast \
 # --use_embedding \
 # --multiprocessing_distributed \
@@ -41,50 +41,48 @@ cd src
 # --world-size '1' \
 # --rank '0' \
 
-python train.py mot \
---exp_id 'optim_mot_17_seed' \
---arch 'rnnforecast_34' \
---load_model '../exp/mot/optim_mot_17_seed/model_last.pth' \
---data_cfg '../src/lib/cfg/mot17.json' \
---batch_size '16' \
---gpus '0,1,2,3' \
---num_workers '16' \
---num_epochs '60' \
---past_length '10' \
---future_length '60' \
---forecast \
---use_embedding \
---multiprocessing_distributed \
---dist-url tcp://127.0.0.1:5565 \
---dist-backend 'nccl' \
---world-size '1' \
---rank '0' \
---resume
+# python train.py mot \
+# --exp_id 'optim_mot_17_seed' \
+# --arch 'rnnforecast_34' \
+# --load_model '../exp/mot/optim_mot_17_seed/model_last.pth' \
+# --data_cfg '../src/lib/cfg/mot17.json' \
+# --batch_size '8' \
+# --gpus '0,1' \
+# --num_workers '8' \
+# --num_epochs '60' \
+# --forecast \
+# --use_embedding \
+# --multiprocessing_distributed \
+# --dist-url tcp://127.0.0.1:5565 \
+# --dist-backend 'nccl' \
+# --world-size '1' \
+# --rank '0' \
+# --resume
 
-python track.py mot \
---exp_id 'optim_mot_17_seed' \
---arch 'rnnforecast_34' \
---load_model '../exp/mot/optim_mot_17_seed/model_last.pth' \
---conf_thres '0.6' \
---val_mot15 \
+# python track.py mot \
+# --exp_id 'optim_mot_17_seed_no_KF' \
+# --arch 'rnnforecast_34' \
+# --load_model '../exp/mot/optim_mot_17_seed/model_last.pth' \
+# --conf_thres '0.6' \
+# --val_mot15 \
 # --forecast \
 # --use_embedding
 
 python track.py mot \
---exp_id 'optim_mot_17_seed' \
+--exp_id 'mix_jla34_no_KF_0.6' \
 --arch 'rnnforecast_34' \
---load_model '../exp/mot/optim_mot_17_seed/model_last.pth' \
---conf_thres '0.4' \
+--load_model '../exp/mot/mix_jla34/model_last.pth' \
+--conf_thres '0.3' \
 --val_mot17 \
 # --forecast \
 # --use_embedding
 
-python track.py mot \
---exp_id 'optim_mot_17_seed' \
---arch 'rnnforecast_34' \
---load_model '../exp/mot/optim_mot_17_seed/model_last.pth' \
---conf_thres '0.3' \
---val_mot20 \
+# python track.py mot \
+# --exp_id 'optim_mot_17_seed' \
+# --arch 'rnnforecast_34' \
+# --load_model '../exp/mot/optim_mot_17_seed/model_last.pth' \
+# --conf_thres '0.3' \
+# --val_mot20 \
 # --forecast \
 # --use_embedding
 
