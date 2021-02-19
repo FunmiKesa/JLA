@@ -10,14 +10,17 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torchvision.ops import nms
-import pandas as pd
+import shutil
 
 #import maskrcnn_benchmark.layers.nms as nms
 # Set printoptions
 torch.set_printoptions(linewidth=1320, precision=5, profile='long')
 np.set_printoptions(linewidth=320, formatter={'float_kind': '{:11.5g}'.format})  # format short g, %precision=5
 
-def mkdir_if_missing(d):
+
+def mkdirs(d, del_existing=False):
+    if del_existing and osp.exists(d):
+        shutil.rmtree(d)
     if not osp.exists(d):
         os.makedirs(d)
 
