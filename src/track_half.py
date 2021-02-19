@@ -19,7 +19,7 @@ from tracking_utils.timer import Timer
 from tracking_utils.evaluation import Evaluator
 import datasets.dataset.jde as datasets
 
-from tracking_utils.utils import mkdir_if_missing
+from tracking_utils.utils import mkdirs
 from opts import opts
 
 
@@ -52,7 +52,7 @@ def write_results(filename, results, data_type):
 
 def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_image=True, frame_rate=30):
     if save_dir:
-        mkdir_if_missing(save_dir)
+        mkdirs(save_dir)
     tracker = JDETracker(opt, frame_rate=frame_rate)
     timer = Timer()
     results = []
@@ -102,7 +102,7 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
          save_images=False, save_videos=False, show_image=True):
     logger.setLevel(logging.INFO)
     result_root = os.path.join(data_root, '..', 'results', exp_name)
-    mkdir_if_missing(result_root)
+    mkdirs(result_root)
     data_type = 'mot'
 
     # run tracking
@@ -255,5 +255,5 @@ if __name__ == '__main__':
          seqs=seqs,
          exp_name=opt.exp_id,
          show_image=False,
-         save_images=False,
+         save_images=True,
          save_videos=False)
