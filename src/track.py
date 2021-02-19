@@ -19,14 +19,14 @@ from tracking_utils.timer import Timer
 from tracking_utils.evaluation import Evaluator
 import datasets.dataset.jde as datasets
 
-from tracking_utils.utils import mkdir_if_missing
+from tracking_utils.utils import mkdirs
 from opts import opts
 import shutil
 
 def write_results_forecasts(dir, results):
     if os.path.exists(dir):
         shutil.rmtree(dir)
-    mkdir_if_missing(dir)
+    mkdirs(dir)
     for frame_id, forecasts in results:
         filename = os.path.join(dir, '{:06d}.txt'.format(frame_id))
         forecasts = np.array(forecasts)
@@ -83,7 +83,7 @@ def write_results_score(filename, results, data_type):
 
 def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_image=True, frame_rate=30):
     if save_dir:
-        mkdir_if_missing(save_dir)
+        mkdirs(save_dir)
     tracker = JDETracker(opt, frame_rate=frame_rate)
     timer = Timer()
     results = []
@@ -145,7 +145,7 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
     logger.setLevel(logging.INFO)
     logger.info((str(sys.argv)))
     result_root = os.path.join(data_root, '..', 'results', exp_name)
-    mkdir_if_missing(result_root)
+    mkdirs(result_root)
     data_type = 'mot'
     metrics = mm.metrics.motchallenge_metrics
     mh = mm.metrics.create()
@@ -162,7 +162,7 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
         output_dir = os.path.join(
             data_root, '..', 'outputs', exp_name, seq) if save_images or save_videos else None
         forecast_dir = os.path.join(
-            opt.forecast_root.replace('future', 'pred'), seq, 'img1') if opt.forecast else None
+            opt.forecast_pred, seq, 'img1') if opt.forecast else None
         opt.forecast_dir = forecast_dir
         logger.info('start seq: {}'.format(seq))
         print(data_root)
@@ -367,6 +367,8 @@ if __name__ == '__main__':
 
     if opt.forecast:
         opt.forecast_root = data_root.replace('images', 'future')
+        opt.forecast_pred = data_root.replace('images', 'pred')
+        mkdirs(opt.forecast_pred, del_existing=True)
     main(opt,
          data_root=data_root,
          seqs=seqs,
