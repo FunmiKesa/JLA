@@ -39,9 +39,11 @@ class STrack(BaseTrack):
         self.smooth_feat = None
         self.update_features(temp_feat)
         self.features = deque([], maxlen=buffer_size)
+        self.past_length = past_length
         self.pasts = deque([], maxlen=past_length)
         self.alpha = 0.9
         self.forecasts = []
+        self.age = 0
 
     def update_features(self, feat):
         feat /= np.linalg.norm(feat)
@@ -60,6 +62,7 @@ class STrack(BaseTrack):
             mean_state[7] = 0
         self.mean, self.covariance = self.kalman_filter.predict(
             mean_state, self.covariance)
+        print(self.mean, self.forecasts_xywh)
 
     @staticmethod
     def multi_predict(stracks):
@@ -81,7 +84,6 @@ class STrack(BaseTrack):
         self.track_id = self.next_id()
         self.mean, self.covariance = self.kalman_filter.initiate(
             self.tlwh_to_xyah(self._tlwh))
-
         self.tracklet_len = 0
         self.state = TrackState.Tracked
         if frame_id == 1:
@@ -94,7 +96,6 @@ class STrack(BaseTrack):
         self.mean, self.covariance = self.kalman_filter.update(
             self.mean, self.covariance, self.tlwh_to_xyah(new_track.tlwh)
         )
-        # self.forecasts = new_track.forecasts
         self.update_features(new_track.curr_feat)
         self.tracklet_len = 0
         self.state = TrackState.Tracked
@@ -102,6 +103,9 @@ class STrack(BaseTrack):
         self.frame_id = frame_id
         if new_id:
             self.track_id = self.next_id()
+        # store previous xywh
+        self.pasts.append([self.frame_id, self.track_id] + list(self.tlbr))
+        # self.forecasts = new_track.forecasts
 
     def update(self, new_track, frame_id, update_feature=True):
         """
@@ -132,8 +136,7 @@ class STrack(BaseTrack):
     # @jit(nopython=True)
     def forecasts_xywh(self):
         """Get forecasts using dcx, dcy, dw, dy"""
-
-        f = self.forecasts.copy().reshape(-1, 4)
+        f = np.array(self.forecasts).reshape(-1, 4)
         f[:, 2:] -= f[:, :2]
         f[:, :2] += f[:, 2:] / 2
 
@@ -411,6 +414,9 @@ class JDETracker(object):
                 # mask = mask.unsqueeze(1).unsqueeze(2).expand_as(pred_futures).float()
 
                 # pp = pred_futures.clone()
+                pred_futures = pred_futures * mask[:, np.newaxis, np.newaxis, ]
+                pred_futures = pred_futures[:objs_count]
+
                 pred_futures[..., [0, 2]] /= output_w
                 pred_futures[..., [1, 3]] /= output_h
                 pred_futures[..., [1, 3]] *= inp_height
@@ -419,7 +425,6 @@ class JDETracker(object):
                 pred_futures[..., [1, 3]] -= dh
                 pred_futures[..., [0, 2]] -= dw
                 pred_futures /= ratio
-                pred_futures = pred_futures * mask[:, np.newaxis, np.newaxis, ]
 
                 # pred_futures_xywh = xyxy2xywh(pred_futures)
 
@@ -451,6 +456,11 @@ class JDETracker(object):
                 cv2.waitKey(1)
         # id0 = id0-1
         # '''
+        if len(selected_strack) > 0:
+            for i, tid in enumerate(selected_strack):
+                t = selected_strack[tid]
+                forecasts = pred_futures[i]
+                t.forecasts = forecasts
 
         if len(dets) > 0:
             '''Detections'''
@@ -487,6 +497,7 @@ class JDETracker(object):
         for itracked, idet in matches:
             track = strack_pool[itracked]
             det = detections[idet]
+            track.age = 0
             if track.state == TrackState.Tracked:
                 track.update(detections[idet], self.frame_id)
                 activated_starcks.append(track)
@@ -495,23 +506,48 @@ class JDETracker(object):
                 refind_stracks.append(track)
 
         ''' Step 3: Second association, with IOU'''
-        detections = [detections[i] for i in u_detection]
+        # detections = [detections[i] for i in u_detection]
         r_tracked_stracks = [strack_pool[i]
                              for i in u_track if strack_pool[i].state == TrackState.Tracked]
-        dists = matching.iou_distance(r_tracked_stracks, detections)
-        matches, u_track, u_detection = matching.linear_assignment(
-            dists, thresh=0.5)
+        # dists = matching.iou_distance(r_tracked_stracks, detections)
+        # matches, u_track, u_detection = matching.linear_assignment(
+        #     dists, thresh=0.5)
 
+        # for itracked, idet in matches:
+        #     track = r_tracked_stracks[itracked]
+        #     det = detections[idet]
+        #     track.age = 0
+        #     if track.state == TrackState.Tracked:
+        #         track.update(det, self.frame_id)
+        #         activated_starcks.append(track)
+        #     else:
+        #         track.re_activate(det, self.frame_id, new_id=False)
+        #         refind_stracks.append(track)
+
+        # for it in u_track:
+        #     track = r_tracked_stracks[it]
+        #     if not track.state == TrackState.Lost:
+        #         track.mark_lost()
+        #         lost_stracks.append(track)
+
+
+        ''' Use forecast predictions'''
+        forecasts = [forcast_track(t, self.frame_id) for t in r_tracked_stracks]
+        forecasts = [t for t in forecasts if t != None]
+        dists = matching.iou_distance(r_tracked_stracks, forecasts)
+        matches, u_track, _ = matching.linear_assignment(
+            dists, thresh=0.5)
+        
         for itracked, idet in matches:
             track = r_tracked_stracks[itracked]
-            det = detections[idet]
+            det = forecasts[idet]
             if track.state == TrackState.Tracked:
                 track.update(det, self.frame_id)
                 activated_starcks.append(track)
             else:
                 track.re_activate(det, self.frame_id, new_id=False)
                 refind_stracks.append(track)
-
+    
         for it in u_track:
             track = r_tracked_stracks[it]
             if not track.state == TrackState.Lost:
@@ -574,53 +610,84 @@ class JDETracker(object):
         logger.debug('Removed: {}'.format(
             [track.track_id for track in removed_stracks]))
 
-        viz = False
-        if len(selected_strack) > 0:
-            for i, tid in enumerate(selected_strack):
-                t = selected_strack[tid]
-                forecasts = pred_futures[i]
-                t.forecasts = forecasts
+        viz = True
+        if viz and (self.frame_id % 1 == 0) :
+            os.environ['DISPLAY'] = 'localhost:15.0'
+            img = img0.copy()
+            tl = round(0.0004 * max(img.shape[0:2])) + 1
+            tf = max(tl - 1, 1)  # font thickness
 
-                if viz and (self.frame_id % 15 == 0) :
-                    os.environ['DISPLAY'] = 'user-MS-7883:11.0'
-                    img = img0.copy()
-                    bbox = t.tlbr
-                    bbox = [int(v) for v in bbox]
-                    cv2.rectangle(img, (bbox[0], bbox[1]),
-                                  (bbox[2], bbox[3]), (0, 255, 0), 2)
-                    color = [random.randint(0, 255) for _ in range(3)]
-                    tl = round(0.0004 * max(img.shape[0:2])) + 1
-                    label = f"{t.track_id}"
-                    bbox_pred = forecasts[0]
+            for t in output_stracks:
+                bbox = t.tlbr
+                bbox = [int(v) for v in bbox]
+                label = f"{t.track_id}"
+
+                cx, cy = (
+                            bbox[0] + bbox[2]) // 2, (bbox[1] + bbox[3]) // 2
+                t_size = cv2.getTextSize(
+                        label, 0, fontScale=tl / 3, thickness=tf)[0]
+                c1, c2 = (bbox[0], bbox[1]
+                                ), (bbox[2], bbox[3])
+                            
+                    
+                c2 = c1[0] + t_size[0], c1[1] - t_size[1] - 3
+                # cv2.rectangle(img, c1, c2, color, -1)
+                cv2.putText(img, label, (cx, cy), 0, tl / 3,
+                            (255, 255, 255), thickness=tf, lineType=cv2.LINE_AA)
+
+            for t in r_tracked_stracks:
+                bbox = t.tlbr
+                bbox = [int(v) for v in bbox]
+                cv2.rectangle(img, (bbox[0], bbox[1]),
+                                (bbox[2], bbox[3]), (0, 255, 0), 2)
+                color = [random.randint(0, 255) for _ in range(3)]
+                
+                label = f"{t.track_id}"
+                t_size = cv2.getTextSize(
+                        label, 0, fontScale=tl / 3, thickness=tf)[0]
+                c1, c2 = (bbox[0], bbox[1]
+                                ), (bbox[2], bbox[3])
+                    
+                c2 = c1[0] + t_size[0], c1[1] - t_size[1] - 3
+                cv2.rectangle(img, c1, c2, color, -1)
+                cv2.putText(img, label, (c1[0], c1[1] - 2), 0, tl / 3,
+                            (255, 255, 255), thickness=tf, lineType=cv2.LINE_AA)
+                if len(t.forecasts):
+                    bbox_pred = t.forecasts[0]
                     bbox_pred = [int(v) for v in bbox_pred]
                     cv2.rectangle(
                         img, (bbox_pred[0], bbox_pred[1]), (bbox_pred[2], bbox_pred[3]), color, 2)
 
-                    c1, c2 = (bbox_pred[0], bbox_pred[1]
-                              ), (bbox_pred[2], bbox_pred[3])
-                    tf = max(tl - 1, 1)  # font thickness
-                    t_size = cv2.getTextSize(
-                        label, 0, fontScale=tl / 3, thickness=tf)[0]
-                    c2 = c1[0] + t_size[0], c1[1] - t_size[1] - 3
-                    cv2.rectangle(img, c1, c2, color, -1)
-                    cv2.putText(img, label, (c1[0], c1[1] - 2), 0, tl / 3,
-                                (255, 255, 255), thickness=tf, lineType=cv2.LINE_AA)
-
-                    for j in range(0, len(forecasts), 5):
-                        bbox_pred = forecasts[j]
+                    for j in range(0, len(t.forecasts), 5):
+                        bbox_pred = t.forecasts[j]
                         bbox_pred = [int(v) for v in bbox_pred]
                         cx, cy = (
                             bbox_pred[0] + bbox_pred[2]) // 2, (bbox_pred[1] + bbox_pred[3]) // 2
                         # cv2.rectangle(img, (bbox_pred[0], bbox_pred[1]), (bbox_pred[2], bbox_pred[3]), (255, 0, j+100), 2)
 
                         cv2.rectangle(img, (cx, cy), (cx+j, cy+j), color, 2)
-
-                    cv2.imshow('forecasts', img)
-                    cv2.waitKey(1)
-                    print(t.track_id, " ", t.frame_id)
+            
+            cv2.namedWindow("forecasts",cv2.WINDOW_NORMAL)
+            cv2.imshow('forecasts', img)
+            cv2.waitKey(1)
+                # print(t.track_id, " ", t.frame_id)
 
         return output_stracks
 
+def forcast_track(track, frame_id):
+    # print(track, track.age, frame_id, track.score )
+    track.age += 1
+    pred = None
+    if (track.age >= 7) or track.score < 0.4: return pred
+    futures = track.forecasts
+    if len(futures) == 0: return pred
+    d = frame_id - track.frame_id
+    tlwh = STrack.tlbr_to_tlwh(futures[d])
+    vertical = tlwh[2] / tlwh[3] > 1.6
+    min_box_area = 100
+    if tlwh[2] * tlwh[3] > min_box_area and not vertical:
+        pred = STrack(tlwh, track.score, track.smooth_feat, 30, past_length=track.past_length)
+    return pred
 
 def joint_stracks(tlista, tlistb):
     exists = {}
