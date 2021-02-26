@@ -610,7 +610,7 @@ class JDETracker(object):
         logger.debug('Removed: {}'.format(
             [track.track_id for track in removed_stracks]))
 
-        viz = True
+        viz = False
         if viz and (self.frame_id % 1 == 0) :
             os.environ['DISPLAY'] = 'localhost:15.0'
             img = img0.copy()
