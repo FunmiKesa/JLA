@@ -25,7 +25,7 @@ from models.utils import _tranpose_and_gather_feat
 class STrack(BaseTrack):
     shared_kalman = KalmanFilter()
 
-    def __init__(self, tlwh, score, temp_feat, buffer_size=30, past_length=15):
+    def __init__(self, tlwh, score, temp_feat, buffer_size=30, past_length=15, use_kf=True):
 
         # wait activate
         self._tlwh = np.asarray(tlwh, dtype=np.float)
@@ -44,6 +44,7 @@ class STrack(BaseTrack):
         self.alpha = 0.9
         self.forecasts = []
         self.age = 0
+        self.use_kf = use_kf
 
     def update_features(self, feat):
         feat /= np.linalg.norm(feat)
@@ -82,7 +83,8 @@ class STrack(BaseTrack):
         """Start a new tracklet"""
         self.kalman_filter = kalman_filter
         self.track_id = self.next_id()
-        self.mean, self.covariance = self.kalman_filter.initiate(
+        if self.use_kf:
+            self.mean, self.covariance = self.kalman_filter.initiate(
             self.tlwh_to_xyah(self._tlwh))
         self.tracklet_len = 0
         self.state = TrackState.Tracked
@@ -93,9 +95,13 @@ class STrack(BaseTrack):
         self.start_frame = frame_id
 
     def re_activate(self, new_track, frame_id, new_id=False):
-        self.mean, self.covariance = self.kalman_filter.update(
-            self.mean, self.covariance, self.tlwh_to_xyah(new_track.tlwh)
-        )
+        if self.use_kf:
+            self.mean, self.covariance = self.kalman_filter.update(
+                self.mean, self.covariance, self.tlwh_to_xyah(new_track.tlwh)
+            )
+        else:
+            self._tlwh = new_track.tlwh
+
         self.update_features(new_track.curr_feat)
         self.tracklet_len = 0
         self.state = TrackState.Tracked
@@ -123,8 +129,12 @@ class STrack(BaseTrack):
         # self.forecasts = new_track.forecasts
 
         new_tlwh = new_track.tlwh
-        self.mean, self.covariance = self.kalman_filter.update(
-            self.mean, self.covariance, self.tlwh_to_xyah(new_tlwh))
+        if self.use_kf:
+            self.mean, self.covariance = self.kalman_filter.update(
+                self.mean, self.covariance, self.tlwh_to_xyah(new_tlwh))
+        else:
+            self._tlwh = new_track.tlwh
+
         self.state = TrackState.Tracked
         self.is_activated = True
 
@@ -231,9 +241,9 @@ class JDETracker(object):
         self.max_per_image = opt.K
         self.mean = np.array(opt.mean, dtype=np.float32).reshape(1, 1, 3)
         self.std = np.array(opt.std, dtype=np.float32).reshape(1, 1, 3)
-
-        self.kalman_filter = KalmanFilter()
-
+        
+        self.use_kf = not opt.no_kf
+        self.kalman_filter = KalmanFilter() if self.use_kf else None
         self.forecast = opt.forecast
         self.past_length = 0
         if self.forecast:
@@ -467,7 +477,7 @@ class JDETracker(object):
             # if self.opt.forecast:
             #     detections = [STrack(STrack.tlbr_to_tlwh(tlbrs[:4]), tlbrs[4], f, 30, ft) for (tlbrs, f, ft) in zip(dets[:, :5], id_feature, pred_futures)]
             # else:
-            detections = [STrack(STrack.tlbr_to_tlwh(tlbrs[:4]), tlbrs[4], f, 30, past_length=self.past_length) for (
+            detections = [STrack(STrack.tlbr_to_tlwh(tlbrs[:4]), tlbrs[4], f, 30, past_length=self.past_length, use_kf=self.use_kf) for (
                 tlbrs, f) in zip(dets[:, :5], id_feature)]
         else:
             detections = []

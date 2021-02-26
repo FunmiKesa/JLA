@@ -209,6 +209,9 @@ class opts(object):
                             help='url used to set up distributed training')
         self.parser.add_argument('--dist-backend', default='nccl', type=str,
                             help='distributed backend')
+
+        self.parser.add_argument('--no_kf', action='store_true',
+                            help='Turn off Kalman Filter')
         
     def parse(self, args=''):
         if args == '':
