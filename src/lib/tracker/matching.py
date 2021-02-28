@@ -134,3 +134,47 @@ def fuse_motion(kf, cost_matrix, tracks, detections, only_position=False, lambda
         cost_matrix[row, gating_distance > gating_threshold] = np.inf
         cost_matrix[row] = lambda_ * cost_matrix[row] + (1 - lambda_) * gating_distance
     return cost_matrix
+
+
+def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.75):
+    if cost_matrix.size == 0:
+        return cost_matrix
+    dists = iou_distance(tracks, detections)
+    # dets = np.array([d.tlbr for d in detections])
+    # dets = np.array([d.xywh[:2] for d in detections])
+
+    # trks = np.array([t.tlbr for t in tracks])
+    # print(dists)
+    for row, track in enumerate(tracks):
+        # t  = track.tlbr
+        # t = track.xywh[:2]
+        # d = 0.5 * ((t - dets).var(1) / (t.var() + dets.var(1) + 1e-8))
+        # d = d ** 0.5
+
+        d = dists[row]
+        # cost_matrix[row, d > 0.4877] = np.inf
+        cost_matrix[row] = lambda_ * cost_matrix[row] + (1 - lambda_) * d
+    return cost_matrix
+
+def normalized_euclidean_distance(atracks, btracks):
+
+    if (len(atracks)>0 and isinstance(atracks[0], np.ndarray)) or (len(btracks) > 0 and isinstance(btracks[0], np.ndarray)):
+        axywhs = atracks
+        bxywhs = btracks
+    else:
+        axywhs = np.array([track.xywh for track in atracks])
+        bxywhs = np.array([track.xywh for track in btracks])
+    
+    dists = np.ones((len(axywhs), len(bxywhs)), dtype=np.float)
+    if dists.size == 0:
+        return dists
+    
+    for i in range(len(axywhs)):
+        axywh = axywhs[i][:2]
+        bxywh = bxywhs[i][:2]
+    
+        dist = 0.5 * ((axywh - bxywh).var( keepdims=True) / (axywh.var(keepdims=True) + bxywh.var( keepdims=True) + 1e-8))
+        dists[i,i] = dist ** 0.5
+    # dists = np.sqrt(dists)
+
+    return dists

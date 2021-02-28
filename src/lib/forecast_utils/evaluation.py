@@ -164,6 +164,8 @@ def save_result(filename, result, index, columns):
     df.loc['Mean'] = df.mean()
     df.to_csv(filename)
 
+    print(df)
+
 # def save_result(filename, result, index, columns):
 #     import pandas as pd
 #     df = pd.DataFrame(result, index=index, columns=columns)
