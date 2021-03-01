@@ -692,7 +692,8 @@ class JDETracker(object):
         # forecasts = [t for t in forecasts if t != None]
 
         r_tracked_stracks = [r_tracked_stracks[i] for i in u_track if r_tracked_stracks[i].state == TrackState.Tracked]
-        forecasts, inds = get_forecast(r_tracked_stracks)
+        forecasts, inds = get_forecast_distance(r_tracked_stracks, (width, height))
+        # forecasts, inds = get_forecast(r_tracked_stracks)
         r_tracks =  [t for i, t in enumerate(r_tracked_stracks) if i not in inds]
         r_tracked_stracks = [r_tracked_stracks[i] for i in inds]
         for track in r_tracks:
@@ -781,6 +782,24 @@ class JDETracker(object):
 
        
         return output_stracks
+    
+def frame_distance(xywh, img_size):
+
+    width, height = img_size
+    center = [width / 2.0, height / 2.0]
+    # convert to xywh
+    centerx = np.linalg.norm(center[:2])
+
+    xywh = np.array(xywh)
+    # calculate the distance of the object with respect to the center of the frame
+    dist = (centerx - np.linalg.norm(xywh[:,:2] - center, axis=1)) / centerx
+
+
+    # print(dist)
+    # dist = np.minimum(1.0,  dist / frame_width)
+
+    return  dist
+ 
 
 def forecast_track2(track):
     # print(track, track.age, frame_id, track.score )
@@ -823,6 +842,32 @@ def forecast_track(track):
     pred = STrack(tlwh, track.score, track.smooth_feat, 30, past_length=track.past_length)
     return pred
 
+
+def forecast_track_in_frame(track, img_size=()):
+    # print(track, track.age, frame_id, track.score )
+    pred = None
+
+    futures = track.forecasts
+    if len(futures) == 0: 
+        return pred
+
+    max_threshold = 30
+    if track.tracklet_len < 20:
+        return pred
+
+    if len(img_size):
+        dist = frame_distance([track.xywh], img_size)
+        max_threshold *= dist[0]
+    if (track.age >= max_threshold) or track.score < 0.4: 
+        return pred
+    
+    track.age += 1
+    
+    tlwh = STrack.tlbr_to_tlwh(futures[track.age])
+    pred = STrack(tlwh, track.score, track.smooth_feat, 30, past_length=track.past_length)
+    return pred
+
+
 def get_forecast(tracks):
     selected = []
     forecasts = []
@@ -831,6 +876,20 @@ def get_forecast(tracks):
         if forecast != None:
             forecasts.append(forecast)
             selected.append(i)
+
+    return forecasts,selected
+
+def get_forecast_distance(tracks, img_size):
+    selected = []
+    forecasts = []
+    for i, t in enumerate(tracks):
+        forecast = forecast_track_in_frame(t, img_size)
+        if forecast != None:
+            # print(t.track_id)
+            forecasts.append(forecast)
+            selected.append(i)
+    # if len(forecasts):
+    #     dists = frame_distance(forecasts, img_size)
 
     return forecasts,selected
 
@@ -873,3 +932,5 @@ def remove_duplicate_stracks(stracksa, stracksb):
     resa = [t for i, t in enumerate(stracksa) if not i in dupa]
     resb = [t for i, t in enumerate(stracksb) if not i in dupb]
     return resa, resb
+
+  
