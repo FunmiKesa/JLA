@@ -43,7 +43,7 @@ class STrack(BaseTrack):
         self.pasts = deque([], maxlen=past_length)
         self.alpha = 0.9
         self.forecasts = []
-        self.age = 0
+        self.forecast_index = 0
         self.use_kf = use_kf
 
     def update_features(self, feat):
@@ -113,7 +113,7 @@ class STrack(BaseTrack):
         self.pasts.append([self.frame_id, self.track_id] + list(self.tlbr))
         # self.forecasts = new_track.forecasts
 
-    def update(self, new_track, frame_id, update_feature=True):
+    def update(self, new_track, frame_id, update_feature=True, use_forecast=False):
         """
         Update a matched track
         :type new_track: STrack
@@ -133,7 +133,15 @@ class STrack(BaseTrack):
             self.mean, self.covariance = self.kalman_filter.update(
                 self.mean, self.covariance, self.tlwh_to_xyah(new_tlwh))
         else:
-            self._tlwh = new_track.tlwh
+
+            # use forecast 
+            if len(self.forecasts):
+                if use_forecast:
+                    self._tlwh = STrack.tlbr_to_tlwh(np.asarray([self.forecasts[self.forecast_index], new_track.tlbr]).mean(axis=0))
+                else:
+                    self._tlwh = new_tlwh
+
+                    
 
         self.state = TrackState.Tracked
         self.is_activated = True
@@ -317,9 +325,8 @@ class JDETracker(object):
             objs_count = 0
             bboxes = []
 
-            strack_pool = joint_stracks(
-                self.tracked_stracks, self.lost_stracks)
-            strack_pool = [t for t in strack_pool if t.age == 0]
+            strack_pool = list(self.tracked_stracks) #joint_stracks(self.tracked_stracks, self.lost_stracks)
+            strack_pool = [t for t in strack_pool if t.time_since_update == 0]
             pasts = np.zeros(
                 (self.max_per_image, self.past_length, self.input_size), dtype=np.float32)
             if len(strack_pool) > 0:
@@ -484,9 +491,10 @@ class JDETracker(object):
             detections = []
         detections_copy = list(detections)
         viz = False
-        # viz = True
+        viz = True
+        # focus = [2, 7, 1, 29]
         if viz and (self.frame_id % 1 == 0) :
-            os.environ['DISPLAY'] = 'localhost:12.0'
+            os.environ['DISPLAY'] = 'localhost:11.0'
             cv2.namedWindow("forecasts",cv2.WINDOW_NORMAL)
             img = img0.copy()
             tl = round(0.0004 * max(img.shape[0:2])) + 1
@@ -496,6 +504,7 @@ class JDETracker(object):
                 bbox = t.tlbr
                 bbox = [int(v) for v in bbox]
                 label = f"{t.track_id}"
+                color = (0, 255, 0)
 
                 cx, cy = (
                             bbox[0] + bbox[2]) // 2, (bbox[1] + bbox[3]) // 2
@@ -503,21 +512,39 @@ class JDETracker(object):
                         label, 0, fontScale=tl / 3, thickness=tf)[0]
                 c1, c2 = (bbox[0], bbox[1]
                                 ), (bbox[2], bbox[3])
-                # cv2.rectangle(
-                #         img, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (0,255,0), 2)
+                cv2.rectangle(
+                        img, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 2)
                             
-                    
                 c2 = c1[0] + t_size[0], c1[1] - t_size[1] - 3
                 # cv2.rectangle(img, c1, c2, color, -1)
                 cv2.putText(img, label, (cx, cy), 0, tl / 3,
-                            (255, 255, 23), thickness=2, lineType=cv2.LINE_AA)
+                            color, thickness=2, lineType=cv2.LINE_AA)
+                color = (255, 255, 23)
+                
+                if len(t.forecasts):
+                    bbox_pred = t.forecasts[t.forecast_index]
+                    bbox_pred = [int(v) for v in bbox_pred]
+                    cv2.rectangle(
+                        img, (bbox_pred[0], bbox_pred[1]), (bbox_pred[2], bbox_pred[3]), color, 2)
 
-            for t in detections_copy:
+                    for j in range(0, len(t.forecasts), 5):
+                        bbox_pred = t.forecasts[j]
+                        bbox_pred = [int(v) for v in bbox_pred]
+                        cx, cy = (
+                            bbox_pred[0] + bbox_pred[2]) // 2, (bbox_pred[1] + bbox_pred[3]) // 2
+                        # cv2.rectangle(img, (bbox_pred[0], bbox_pred[1]), (bbox_pred[2], bbox_pred[3]), (255, 0, j+100), 2)
+
+                        cv2.rectangle(img, (cx, cy), (cx+j, cy+j), color, 2)
+            
+            
+
+            for t in detections_copy  + self.lost_stracks:
                 bbox = t.tlbr
                 bbox = [int(v) for v in bbox]
+                color = (0, 0, 255) if t.state == 2 else (255, 0, 0)
                 cv2.rectangle(img, (bbox[0], bbox[1]),
-                                (bbox[2], bbox[3]), (0, 255, 0), 2)
-                color = [random.randint(0, 255) for _ in range(3)]
+                                (bbox[2], bbox[3]),color , 2)
+                # color = [random.randint(0, 255) for _ in range(3)]
                 
                 label = f"{t.track_id}-{ int(t.score * 100)}"
                 t_size = cv2.getTextSize(
@@ -530,7 +557,7 @@ class JDETracker(object):
                 cv2.putText(img, label, (c1[0], c1[1] - 2), 0, tl / 3,
                             (255, 255, 255), thickness=tf, lineType=cv2.LINE_AA)
                 if len(t.forecasts):
-                    bbox_pred = t.forecasts[0]
+                    bbox_pred = t.forecasts[t.forecast_index]
                     bbox_pred = [int(v) for v in bbox_pred]
                     cv2.rectangle(
                         img, (bbox_pred[0], bbox_pred[1]), (bbox_pred[2], bbox_pred[3]), color, 2)
@@ -564,22 +591,27 @@ class JDETracker(object):
         # strack.predict()
         
         dists = matching.embedding_distance(strack_pool, detections)
-        #dists = matching.iou_distance(strack_pool, detections)
+        # dists = matching.iou_distance(strack_pool, detections)
         if self.use_kf:
             STrack.multi_predict(strack_pool)
             dists = matching.fuse_motion(
                 self.kalman_filter, dists, strack_pool, detections)
         else:
             #fuse short term motion
-            forecasts = [forecast_track2(t) for t in strack_pool]
-            dists = matching.fuse_motion2(dists, forecasts, detections)
+            r_tracked_stracks = list(strack_pool)
+            dists, forecasts_inds = matching.fuse_motion2(dists, r_tracked_stracks, detections)
         matches, u_track, u_detection = matching.linear_assignment(
                 dists, thresh=0.4)
 
         for itracked, idet in matches:
             track = strack_pool[itracked]
             det = detections[idet]
-            track.age = 0
+            track.forecast_index = int(forecasts_inds[itracked, idet])
+            track.time_since_update = 0
+
+            # if len(track.forecasts):
+                # det._tlwh = STrack.tlbr_to_tlwh(np.asarray([track.forecasts[time_since_update], det.tlbr]).mean(axis=0))
+            # track.time_since_update = 0
             if track.state == TrackState.Tracked:
                 track.update(detections[idet], self.frame_id)
                 activated_starcks.append(track)
@@ -609,7 +641,7 @@ class JDETracker(object):
         # for itracked, idet in matches:
         #     track = r_tracked_stracks[itracked]
         #     det = forecasts[idet]
-        #     # track.age = 0
+        #     # track.time_since_update = 0
         #     if track.state == TrackState.Tracked:
         #         track.update(det, self.frame_id)
         #         activated_starcks.append(track)
@@ -636,7 +668,7 @@ class JDETracker(object):
         # for itracked, idet in matches:
         #     track = strack_pool[itracked]
         #     det = detections[idet]
-        #     track.age = 0
+        #     track.time_since_update = 0
         #     if track.state == TrackState.Tracked:
         #         track.update(detections[idet], self.frame_id)
         #         activated_starcks.append(track)
@@ -654,7 +686,9 @@ class JDETracker(object):
         for itracked, idet in matches:
             track = r_tracked_stracks[itracked]
             det = detections[idet]
-            track.age = 0
+            # if len(track.forecasts):
+                # det._tlwh = STrack.tlbr_to_tlwh(np.asarray([track.forecasts[track.time_since_update+1], det.tlbr]).mean(axis=0))
+            track.time_since_update = 0
             if track.state == TrackState.Tracked:
                 track.update(det, self.frame_id)
                 activated_starcks.append(track)
@@ -672,7 +706,7 @@ class JDETracker(object):
         # for itracked, idet in matches:
         #     track = r_tracked_stracks[itracked]
         #     det = detections[idet]
-        #     track.age = 0
+        #     track.time_since_update = 0
         #     if track.state == TrackState.Tracked:
         #         track.update(det, self.frame_id)
         #         activated_starcks.append(track)
@@ -687,33 +721,31 @@ class JDETracker(object):
         #         lost_stracks.append(track)
 
 
-        # ''' Use forecast predictions'''
-        # forecasts = [forecast_track(t) for t in r_tracked_stracks]
-        # forecasts = [t for t in forecasts if t != None]
+        ''' Use forecast predictions'''
+        if not self.use_kf:
+            r_tracked_stracks = [r_tracked_stracks[i] for i in u_track if r_tracked_stracks[i].state == TrackState.Tracked]
+            forecasts, inds = get_forecast_distance(r_tracked_stracks, (width, height))
+            # forecasts, inds = get_forecast(r_tracked_stracks)
+            r_tracks =  [t for i, t in enumerate(r_tracked_stracks) if i not in inds]
+            r_tracked_stracks = [r_tracked_stracks[i] for i in inds]
+            for track in r_tracks:
+                if not track.state == TrackState.Lost:
+                    track.mark_lost()
+                    lost_stracks.append(track)
 
-        r_tracked_stracks = [r_tracked_stracks[i] for i in u_track if r_tracked_stracks[i].state == TrackState.Tracked]
-        forecasts, inds = get_forecast_distance(r_tracked_stracks, (width, height))
-        # forecasts, inds = get_forecast(r_tracked_stracks)
-        r_tracks =  [t for i, t in enumerate(r_tracked_stracks) if i not in inds]
-        r_tracked_stracks = [r_tracked_stracks[i] for i in inds]
-        for track in r_tracks:
-            if not track.state == TrackState.Lost:
-                track.mark_lost()
-                lost_stracks.append(track)
-
-        dists = matching.iou_distance(r_tracked_stracks, forecasts)
-        matches, u_track, _ = matching.linear_assignment(
-            dists, thresh=0.5)
-        
-        for itracked, idet in matches:
-            track = r_tracked_stracks[itracked]
-            det = forecasts[idet]
-            if track.state == TrackState.Tracked:
-                track.update(det, self.frame_id, False)
-                activated_starcks.append(track)
-            else:
-                track.re_activate(det, self.frame_id, new_id=False)
-                refind_stracks.append(track)
+            dists = matching.iou_distance(r_tracked_stracks, forecasts)
+            matches, u_track, _ = matching.linear_assignment(
+                dists, thresh=0.5)
+            
+            for itracked, idet in matches:
+                track = r_tracked_stracks[itracked]
+                det = forecasts[idet]
+                if track.state == TrackState.Tracked:
+                    track.update(det, self.frame_id, False)
+                    activated_starcks.append(track)
+                else:
+                    track.re_activate(det, self.frame_id, new_id=False)
+                    refind_stracks.append(track)
     
         for it in u_track:
             track = r_tracked_stracks[it]
@@ -801,83 +833,58 @@ def frame_distance(xywh, img_size):
     return  dist
  
 
-def forecast_track2(track):
-    # print(track, track.age, frame_id, track.score )
-    pred = copy.deepcopy(track)
-    futures = track.forecasts
-    if len(futures) == 0: 
-        return pred
+# def forecast_track2(track):
+#     # print(track, track.time_since_update, frame_id, track.score )
+#     pred = copy.deepcopy(track)
+#     # futures = track.forecasts
+#     # if len(futures) == 0: 
+#     #     return pred
 
-    # if (track.end_frame - track.start_frame) < 10: 
-    #     return pred
-    if track.tracklet_len < 20:
-        return pred
+#     # if (track.end_frame - track.start_frame) < 10: 
+#     #     return pred
+#     if track.tracklet_len < 10:
+#         return pred
 
-    if (track.age >= 20) or track.score < 0.4: 
-        return pred
+#     # if (track.time_since_update >= 20) or track.score < 0.4: 
+#     #     return pred
 
-    track.age += 1
+#     # track.time_since_update += 1
     
-    tlwh = STrack.tlbr_to_tlwh(futures[track.age])
-    pred._tlwh = tlwh
-    return pred
-
-def forecast_track(track):
-    # print(track, track.age, frame_id, track.score )
-    pred = None
-
-    futures = track.forecasts
-    if len(futures) == 0: 
-        return pred
-
-    if track.tracklet_len < 20:
-        return pred
-
-    if (track.age >= 20) or track.score < 0.4: 
-        return pred
-    
-    track.age += 1
-    
-    tlwh = STrack.tlbr_to_tlwh(futures[track.age])
-    pred = STrack(tlwh, track.score, track.smooth_feat, 30, past_length=track.past_length)
-    return pred
-
+#     # tlwh = STrack.tlbr_to_tlwh(futures[track.time_since_update])
+#     # pred._tlwh = tlwh
+#     return pred
 
 def forecast_track_in_frame(track, img_size=()):
-    # print(track, track.age, frame_id, track.score )
+    # print(track, track.time_since_update, frame_id, track.score )
+
     pred = None
 
     futures = track.forecasts
-    if len(futures) == 0: 
-        return pred
+    # if len(futures) < 10: 
+    #     return pred
 
-    max_threshold = 30
-    if track.tracklet_len < 20:
+    max_threshold = 20
+    if track.tracklet_len < 10:
         return pred
+    
 
     if len(img_size):
         dist = frame_distance([track.xywh], img_size)
-        max_threshold *= dist[0]
-    if (track.age >= max_threshold) or track.score < 0.4: 
+        max_threshold = (max_threshold  * dist[0]) + (max_threshold * track.score / (track.time_since_update + 1))
+    if (track.time_since_update >= max_threshold) or track.score < 0.4: 
         return pred
     
-    track.age += 1
+    track.time_since_update += 1
     
-    tlwh = STrack.tlbr_to_tlwh(futures[track.age])
+    forecast_index = (track.forecast_index + 1) * track.time_since_update
+    if forecast_index >= len(futures):
+        return pred
+    # track.forecast_index += track.time_since_update
+    
+    tlwh = STrack.tlbr_to_tlwh(futures[forecast_index])
     pred = STrack(tlwh, track.score, track.smooth_feat, 30, past_length=track.past_length)
     return pred
 
-
-def get_forecast(tracks):
-    selected = []
-    forecasts = []
-    for i, t in enumerate(tracks):
-        forecast = forecast_track(t)
-        if forecast != None:
-            forecasts.append(forecast)
-            selected.append(i)
-
-    return forecasts,selected
 
 def get_forecast_distance(tracks, img_size):
     selected = []
@@ -885,11 +892,8 @@ def get_forecast_distance(tracks, img_size):
     for i, t in enumerate(tracks):
         forecast = forecast_track_in_frame(t, img_size)
         if forecast != None:
-            # print(t.track_id)
             forecasts.append(forecast)
             selected.append(i)
-    # if len(forecasts):
-    #     dists = frame_distance(forecasts, img_size)
 
     return forecasts,selected
 
