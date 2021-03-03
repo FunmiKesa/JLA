@@ -303,6 +303,7 @@ class JDETracker(object):
                 'out_height': inp_height // self.opt.down_ratio,
                 'out_width': inp_width // self.opt.down_ratio}
         selected_strack = {}
+        # inspect = [14]
 
         if self.opt.forecast:
             im_blob = [im_blob]
@@ -479,6 +480,7 @@ class JDETracker(object):
                 t = selected_strack[tid]
                 forecasts = pred_futures[i]
                 t.forecasts = forecasts
+                # t.forecast_index = 0
 
         if len(dets) > 0:
             '''Detections'''
@@ -490,91 +492,7 @@ class JDETracker(object):
         else:
             detections = []
         detections_copy = list(detections)
-        viz = False
-        viz = True
-        # focus = [2, 7, 1, 29]
-        if viz and (self.frame_id % 1 == 0) :
-            os.environ['DISPLAY'] = 'localhost:11.0'
-            cv2.namedWindow("forecasts",cv2.WINDOW_NORMAL)
-            img = img0.copy()
-            tl = round(0.0004 * max(img.shape[0:2])) + 1
-            tf = max(tl - 1, 1)  # font thickness
-
-            for t in self.tracked_stracks:
-                bbox = t.tlbr
-                bbox = [int(v) for v in bbox]
-                label = f"{t.track_id}"
-                color = (0, 255, 0)
-
-                cx, cy = (
-                            bbox[0] + bbox[2]) // 2, (bbox[1] + bbox[3]) // 2
-                t_size = cv2.getTextSize(
-                        label, 0, fontScale=tl / 3, thickness=tf)[0]
-                c1, c2 = (bbox[0], bbox[1]
-                                ), (bbox[2], bbox[3])
-                cv2.rectangle(
-                        img, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 2)
-                            
-                c2 = c1[0] + t_size[0], c1[1] - t_size[1] - 3
-                # cv2.rectangle(img, c1, c2, color, -1)
-                cv2.putText(img, label, (cx, cy), 0, tl / 3,
-                            color, thickness=2, lineType=cv2.LINE_AA)
-                color = (255, 255, 23)
-                
-                if len(t.forecasts):
-                    bbox_pred = t.forecasts[t.forecast_index]
-                    bbox_pred = [int(v) for v in bbox_pred]
-                    cv2.rectangle(
-                        img, (bbox_pred[0], bbox_pred[1]), (bbox_pred[2], bbox_pred[3]), color, 2)
-
-                    for j in range(0, len(t.forecasts), 5):
-                        bbox_pred = t.forecasts[j]
-                        bbox_pred = [int(v) for v in bbox_pred]
-                        cx, cy = (
-                            bbox_pred[0] + bbox_pred[2]) // 2, (bbox_pred[1] + bbox_pred[3]) // 2
-                        # cv2.rectangle(img, (bbox_pred[0], bbox_pred[1]), (bbox_pred[2], bbox_pred[3]), (255, 0, j+100), 2)
-
-                        cv2.rectangle(img, (cx, cy), (cx+j, cy+j), color, 2)
-            
-            
-
-            for t in detections_copy  + self.lost_stracks:
-                bbox = t.tlbr
-                bbox = [int(v) for v in bbox]
-                color = (0, 0, 255) if t.state == 2 else (255, 0, 0)
-                cv2.rectangle(img, (bbox[0], bbox[1]),
-                                (bbox[2], bbox[3]),color , 2)
-                # color = [random.randint(0, 255) for _ in range(3)]
-                
-                label = f"{t.track_id}-{ int(t.score * 100)}"
-                t_size = cv2.getTextSize(
-                        label, 0, fontScale=tl / 3, thickness=tf)[0]
-                c1, c2 = (bbox[0], bbox[1]
-                                ), (bbox[2], bbox[3])
-                    
-                c2 = c1[0] + t_size[0], c1[1] - t_size[1] - 3
-                cv2.rectangle(img, c1, c2, color, -1)
-                cv2.putText(img, label, (c1[0], c1[1] - 2), 0, tl / 3,
-                            (255, 255, 255), thickness=tf, lineType=cv2.LINE_AA)
-                if len(t.forecasts):
-                    bbox_pred = t.forecasts[t.forecast_index]
-                    bbox_pred = [int(v) for v in bbox_pred]
-                    cv2.rectangle(
-                        img, (bbox_pred[0], bbox_pred[1]), (bbox_pred[2], bbox_pred[3]), color, 2)
-
-                    for j in range(0, len(t.forecasts), 5):
-                        bbox_pred = t.forecasts[j]
-                        bbox_pred = [int(v) for v in bbox_pred]
-                        cx, cy = (
-                            bbox_pred[0] + bbox_pred[2]) // 2, (bbox_pred[1] + bbox_pred[3]) // 2
-                        # cv2.rectangle(img, (bbox_pred[0], bbox_pred[1]), (bbox_pred[2], bbox_pred[3]), (255, 0, j+100), 2)
-
-                        cv2.rectangle(img, (cx, cy), (cx+j, cy+j), color, 2)
-            
-            
-            cv2.imshow('forecasts', img)
-            cv2.waitKey(1)
-
+        
         ''' Add newly detected tracklets to tracked_stracks'''
         unconfirmed = []
         tracked_stracks = []  # type: list[STrack]
