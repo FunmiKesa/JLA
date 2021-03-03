@@ -136,7 +136,7 @@ def fuse_motion(kf, cost_matrix, tracks, detections, only_position=False, lambda
     return cost_matrix
 
 
-def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.75, max_length=10):
+def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.75, max_length=20):
     forecasts_inds = np.zeros((len(tracks), len(detections)), dtype=np.int)
 
     if cost_matrix.size == 0:
@@ -155,13 +155,13 @@ def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.75, max_length=10):
         if len(track.forecasts) > 0:
             forecasts = track.forecasts[:max_length]
             f_dists = iou_distance(forecasts, dets)
-            i = np.argmax(f_dists < 0.4, axis=0)
+            i = np.argmax(f_dists < 0.3, axis=0)
             v = f_dists.T[np.arange(f_dists.shape[1]), i.squeeze()]
             d = (v * max_length / (max_length - i))  * dists[row]
             forecasts_inds[row] = i
+            cost_matrix[row, d >= 1] *= 2.5
         else:
             d = dists[row]
-        # cost_matrix[row, d >= 1] = np.inf
         cost_matrix[row] = lambda_ * cost_matrix[row] + (1 - lambda_) * d
     return cost_matrix, forecasts_inds
 
