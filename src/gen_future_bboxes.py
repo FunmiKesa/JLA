@@ -16,6 +16,7 @@ def gen_future_files(seq_label_root, future_label_root, future_length=60, img_si
     bboxes = []
     label_file_paths = {}
     fid = 0
+    size = img_size
     for filepath in sorted(glob.glob(seq_label_root + "/*.txt")):
         fname = filepath.split('/')[-1]
         fid += 1
@@ -40,9 +41,9 @@ def gen_future_files(seq_label_root, future_label_root, future_length=60, img_si
                 continue
 
             img = cv2.imread(image_file)
-            img_size = img.shape[:2]
-            print(img_size, filepath)
-        seq_height, seq_width = img_size
+            size = img.shape[:2]
+            print(size, filepath)
+        seq_height, seq_width = size
         if len(bbox.shape) == 1:
             bbox = bbox.reshape(1, bbox.shape[0])
         # convert the original size
@@ -82,8 +83,8 @@ def gen_future_files(seq_label_root, future_label_root, future_length=60, img_si
 
 
 if __name__ == "__main__":
-    datasets = ["CityWalks"]
-    # datasets = ["CityWalks", "PRW", "Caltech", "MOT15", "MOT16", "MOT17", "MOT20"]
+    datasets = ["PRW", "Caltech","CityWalks",  "MOT15", "MOT16", "MOT17", "MOT20"]
+    datasets = ["PRW", "Caltech"]
     future_label = 'future'
     future_length = 60
     for d in datasets:

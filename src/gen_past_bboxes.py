@@ -27,6 +27,7 @@ def gen_past_files(seq_label_root, past_label_root, past_length=30, img_size=Non
                 "Something is not right! Frame id should be unique. Please check the source code and data.")
 
         bbox = np.loadtxt(filepath, dtype=np.float64)
+        size = img_size
         if not img_size:
             # get image
             img_filepath = filepath.replace('labels_with_ids', 'images')
@@ -38,8 +39,8 @@ def gen_past_files(seq_label_root, past_label_root, past_length=30, img_size=Non
                 continue
 
             img = cv2.imread(image_file)
-            img_size = img.shape[:2]
-        seq_height, seq_width = img_size
+            size = img.shape[:2]
+        seq_height, seq_width = size
         if len(bbox.shape) == 1:
             bbox = bbox.reshape(1, bbox.shape[0])
         # convert the original size
@@ -81,7 +82,7 @@ def gen_past_files(seq_label_root, past_label_root, past_length=30, img_size=Non
 
 if __name__ == "__main__":
     datasets = ["PRW", "Caltech", "MOT15", "MOT16", "MOT17", "MOT20"]
-    datasets = ["CityWalks","PRW",]
+    datasets = ["CityWalks","PRW","Caltech"]
 
     past_label = 'past'
     past_length = 30
@@ -152,6 +153,16 @@ if __name__ == "__main__":
                 seq_root = f'data/{d}/images'
                 label_root = f'data/{d}/labels_with_ids'
                 img_size = (1080, 1920)
+
+                past_label_root = label_root.replace(
+                    'labels_with_ids', past_label)
+
+                gen_past_files(label_root, past_label_root, past_length,
+                               img_size)
+            elif 'crowdhuman' in d:
+                seq_root = f'data/{d}/images/val'
+                label_root = f'data/{d}/labels_with_ids/val'
+                img_size = None
 
                 past_label_root = label_root.replace(
                     'labels_with_ids', past_label)
