@@ -526,12 +526,13 @@ class RNNForecast(nn.Module):
             hidden_size = forecast['hidden_size']
             output_size = forecast['output_size']
             future_length = forecast['future_length']
-            emb_size = forecast['emb_size']
+            use_embedding = forecast['use_embedding']
 
-            self.rnn = ForeCastRNN(input_size, output_size, future_length, hidden_size, use_embedding=emb_size > 1)
+            self.rnn = ForeCastRNN(input_size, output_size, future_length, hidden_size, use_embedding=use_embedding)
 
             self.forecast = forecast
-            heads['fct'] = emb_size
+            if use_embedding:
+                heads['fct'] = hidden_size // 2
             
         self.heads = heads
         for head in self.heads:

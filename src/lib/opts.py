@@ -237,6 +237,7 @@ class opts(object):
                 'input_size': 8,
                 'output_size': 4,
                 'fixed_length': opt.fixed_length,
+                'use_embedding': opt.use_embedding,
             }
 
         if opt.head_conv == -1:  # init default head_conv
@@ -296,8 +297,6 @@ class opts(object):
             #opt.img_size = (864, 480)
             #opt.img_size = (576, 320)
             if opt.forecast:
-                emb_size = 256 if opt.use_embedding else 1
-                opt.forecast.update({'emb_size': emb_size})
                 opt.heads.update({'fct': opt.forecast})
             
         else:

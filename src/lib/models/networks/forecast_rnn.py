@@ -37,7 +37,7 @@ class DecoderRNN(nn.Module):
         self.relu_dla_features = nn.ReLU()
         self.context_encoder = nn.Linear(
             self.num_hidden, int(self.num_hidden / 2))
-        self.dla_encoder = nn.Linear(256, int(self.num_hidden / 2))
+        self.dla_encoder = nn.Linear(self.num_hidden // 2, int(self.num_hidden / 2))
 
     def forward(self, context, dla_features=None, future_length=5,  past_length=10):
         outputs = []
