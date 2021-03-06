@@ -159,7 +159,7 @@ def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.75, max_length=20):
             v = f_dists.T[np.arange(f_dists.shape[1]), i.squeeze()]
             d = (v * max_length / (max_length - i))  * dists[row]
             forecasts_inds[row] = i
-            cost_matrix[row, d >= 1] *= 2.5
+            cost_matrix[row, d >= 1] *= 2
         else:
             d = dists[row]
         cost_matrix[row] = lambda_ * cost_matrix[row] + (1 - lambda_) * d
