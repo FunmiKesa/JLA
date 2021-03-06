@@ -6,7 +6,27 @@ sh ../src/scripts/gdrive.sh 1iqRQjsG9BawIl8SlFomMg5iwkb6nqSpi fairmot_dla34.pth
 sh ../src/scripts/gdrive.sh 1SFOhg_vos_xSYHLMTDGFVZBYjo8cr2fG crowdhuman_dla34.pth
 cd ..
 
-cd data
+cd ./data
+mkdir Crowdhuman-files
+cd Crowdhuman-files
+echo `pwd`
+
+sh ../../src/scripts/gdrive.sh 1tQG3E_RrRI4wIGskorLTmDiWHH2okVvk CrowdHuman_test.zip
+sh ../../src/scripts/gdrive.sh 10WIRwu8ju8GRLuCkZ_vT6hnNxs5ptwoL annotation_val.odgt
+sh ../../src/scripts/gdrive.sh 1UUTea5mYqvlUObsC1Z8CFldHJAtLtMX3 annotation_train.odgt
+sh ../../src/scripts/gdrive.sh 18jFI789CoHTppQ7vmRSFEdnGaSQZ4YzO CrowdHuman_val.zip
+sh ../../src/scripts/gdrive.sh 1tdp0UCgxrqy1B6p8LkR-Iy0aIJ8l4fJW CrowdHuman_train03.zip
+sh ../../src/scripts/gdrive.sh 17evzPh7gc1JBNvnW1ENXLy5Kr4Q_Nnla CrowdHuman_train02.zip
+sh ../../src/scripts/gdrive.sh 134QOvaatwKdy0iIeNqA_p-xkAhkV4F8Y CrowdHuman_train01.zip
+
+unzip CrowdHuman_test.zip
+unzip CrowdHuman_val.zip
+unzip CrowdHuman_train03.zip
+unzip CrowdHuman_train02.zip
+unzip CrowdHuman_train01.zip
+
+cd ..
+
 mkdir Caltech-files
 cd Caltech-files
 
