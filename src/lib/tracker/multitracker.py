@@ -527,9 +527,6 @@ class JDETracker(object):
             track.forecast_index = int(forecasts_inds[itracked, idet])
             track.time_since_update = 0
 
-            # if len(track.forecasts):
-                # det._tlwh = STrack.tlbr_to_tlwh(np.asarray([track.forecasts[time_since_update], det.tlbr]).mean(axis=0))
-            # track.time_since_update = 0
             if track.state == TrackState.Tracked:
                 track.update(detections[idet], self.frame_id)
                 activated_starcks.append(track)
@@ -538,61 +535,6 @@ class JDETracker(object):
                 refind_stracks.append(track)
 
         # r_tracked_stracks = list(strack_pool)
-
-        # # long term motion
-
-        # r_tracked_stracks = [strack_pool[i]
-        #                      for i in u_track if strack_pool[i].state == TrackState.Tracked]
-        # forecasts, inds = get_forecast(r_tracked_stracks)
-        # u_track =  [t for i, t in enumerate(r_tracked_stracks) if i not in inds]
-        # for track in u_track:
-        #     if not track.state == TrackState.Lost:
-        #         track.mark_lost()
-        #         lost_stracks.append(track)
-
-        # r_tracked_stracks = [r_tracked_stracks[i] for i in inds]
-        # dists = matching.normalized_euclidean_distance(r_tracked_stracks, forecasts)
-        # # dists = matching.iou_distance(r_tracked_stracks, forecasts)
-        # matches, u_track, _ = matching.linear_assignment(
-        #     dists, thresh=0.5)
-        
-        # for itracked, idet in matches:
-        #     track = r_tracked_stracks[itracked]
-        #     det = forecasts[idet]
-        #     # track.time_since_update = 0
-        #     if track.state == TrackState.Tracked:
-        #         track.update(det, self.frame_id)
-        #         activated_starcks.append(track)
-        #     else:
-        #         track.re_activate(det, self.frame_id, new_id=False)
-        #         refind_stracks.append(track)
-
-
-        # for it in u_track:
-        #     track = r_tracked_stracks[it]
-        #     if not track.state == TrackState.Lost:
-        #         track.mark_lost()
-        #         lost_stracks.append(track)
-
-        
-
-        
-        
-        # forecasts = [forcast_track2(t, self.frame_id) for t in r_tracked_stracks]
-        # dists = matching.fuse_motion2(dists, forecasts, detections)
-        # matches, u_track, u_detection = matching.linear_assignment(
-        #     dists, thresh=0.4)
-
-        # for itracked, idet in matches:
-        #     track = strack_pool[itracked]
-        #     det = detections[idet]
-        #     track.time_since_update = 0
-        #     if track.state == TrackState.Tracked:
-        #         track.update(detections[idet], self.frame_id)
-        #         activated_starcks.append(track)
-        #     else:
-        #         track.re_activate(det, self.frame_id, new_id=False)
-        #         refind_stracks.append(track)
 
         ''' Step 3: Second association, with IOU'''
 
@@ -613,31 +555,6 @@ class JDETracker(object):
             else:
                 track.re_activate(det, self.frame_id, new_id=False)
                 refind_stracks.append(track)
-
-        # # detections = [detections[i] for i in u_detection]
-        # r_tracked_stracks = [strack_pool[i]
-        #                      for i in u_track if strack_pool[i].state == TrackState.Tracked]
-        # dists = matching.iou_distance(r_tracked_stracks, detections)
-        # matches, u_track, u_detection = matching.linear_assignment(
-        #     dists, thresh=0.5)
-
-        # for itracked, idet in matches:
-        #     track = r_tracked_stracks[itracked]
-        #     det = detections[idet]
-        #     track.time_since_update = 0
-        #     if track.state == TrackState.Tracked:
-        #         track.update(det, self.frame_id)
-        #         activated_starcks.append(track)
-        #     else:
-        #         track.re_activate(det, self.frame_id, new_id=False)
-        #         refind_stracks.append(track)
-
-        # for it in u_track:
-        #     track = r_tracked_stracks[it]
-        #     if not track.state == TrackState.Lost:
-        #         track.mark_lost()
-        #         lost_stracks.append(track)
-
 
         ''' Use forecast predictions'''
         if not self.use_kf:
