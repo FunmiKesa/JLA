@@ -411,26 +411,6 @@ class JDETracker(object):
                 # flip back
                 pasts_mask = np.flip(pasts_mask, 1)
                 mask = pasts_mask.max(axis=1)
-                # l  = pred_futures.copy()
-                # l = xywh2xyxy(l.copy())
-                # l = l.transpose((1,0,2))
-                # n = mask > 0
-                # p = np.zeros((60, objs_count, 6))
-                # p[:,:, :4] = l[:, :objs_count, :]
-                # p[:,:, 4] = 1 
-
-                # p = torch.from_numpy(p)
-                # p = self.post_process(p, meta)
-                # p = self.merge_outputs([p])[1]
-
-                # p = p.reshape(60, -1, 5)
-                # p = p.transpose((1,0,2))
-                # p = p[..., :4]
-                # # p_xywh = xyxy2xywh(p)
-                # pred_futures = p
-
-                # mask = pasts_mask.max(dim=1)[0]
-                # mask = mask.unsqueeze(1).unsqueeze(2).expand_as(pred_futures).float()
 
                 # pp = pred_futures.clone()
                 pred_futures = pred_futures * mask[:, np.newaxis, np.newaxis, ]
@@ -576,7 +556,7 @@ class JDETracker(object):
                 track = r_tracked_stracks[itracked]
                 det = forecasts[idet]
                 if track.state == TrackState.Tracked:
-                    track.update(det, self.frame_id, False)
+                    track.update(det, self.frame_id)
                     activated_starcks.append(track)
                 else:
                     track.re_activate(det, self.frame_id, new_id=False)
@@ -647,6 +627,64 @@ class JDETracker(object):
         logger.debug('Removed: {}'.format(
             [track.track_id for track in removed_stracks]))
 
+        viz = False
+        # viz = True
+        # focus = [2, 7, 1, 29]
+        if viz and (self.frame_id % 1 == 0) :
+            os.environ['DISPLAY'] = 'localhost:11.0'
+            cv2.namedWindow("forecasts",cv2.WINDOW_NORMAL)
+            img = img0.copy()
+            tl = round(0.0004 * max(img.shape[0:2])) + 1
+            tf = max(tl - 1, 1)  # font thickness
+            colors  = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
+
+            tracks = output_stracks+ detections_copy  + lost_stracks
+            for t in tracks:
+                if t.track_id not in range(10):
+                    continue
+
+                bbox = t.tlbr
+                bbox = [int(v) for v in bbox]
+                color = colors[t.state]
+                cv2.rectangle(img, (bbox[0], bbox[1]),
+                                (bbox[2], bbox[3]),color , 2)
+                # color = [random.randint(0, 255) for _ in range(3)]
+                
+                label = f"{t.track_id}-{ int(t.score * 100)}"
+                t_size = cv2.getTextSize(
+                        label, 0, fontScale=tl / 3, thickness=tf)[0]
+                up = bbox[3] if t.state == 0 else bbox[1]
+                c1, c2 = (bbox[0], up
+                                ), (bbox[2], bbox[3])
+                    
+                # c2 = c1[0] + t_size[0], c1[1] - t_size[1] - 3
+                # cv2.rectangle(img, c1, c2, color, -1)
+                cv2.putText(img, label, (c1[0], c1[1] - 2), 0, tl / 3,
+                            color, thickness=tf, lineType=cv2.LINE_AA)
+                color = (255, 255, 23)
+                if len(t.forecasts):
+                    bbox_pred = t.forecasts[t.forecast_index]
+                    bbox_pred = [int(v) for v in bbox_pred]
+                    cv2.rectangle(
+                        img, (bbox_pred[0], bbox_pred[1]), (bbox_pred[2], bbox_pred[3]), color, 2)
+                    up = bbox_pred[3] if t.state == 0 else bbox[1]
+                    c1, c2 = (bbox_pred[0], up
+                                ), (bbox_pred[2], bbox_pred[3])
+                    cv2.putText(img, label, (c1[0], c1[1] - 2), 0, tl / 3,
+                            color, thickness=tf, lineType=cv2.LINE_AA)
+
+                    for j in range(0, len(t.forecasts), 5):
+                        bbox_pred = t.forecasts[j]
+                        bbox_pred = [int(v) for v in bbox_pred]
+                        cx, cy = (
+                            bbox_pred[0] + bbox_pred[2]) // 2, (bbox_pred[1] + bbox_pred[3]) // 2
+                        # cv2.rectangle(img, (bbox_pred[0], bbox_pred[1]), (bbox_pred[2], bbox_pred[3]), (255, 0, j+100), 2)
+
+                        cv2.rectangle(img, (cx, cy), (cx+j, cy+j), color, 2)
+            
+            
+            cv2.imshow('forecasts', img)
+            cv2.waitKey(1)
        
         return output_stracks
     
@@ -706,7 +744,7 @@ def forecast_track_in_frame(track, img_size=()):
     if len(img_size):
         dist = frame_distance([track.xywh], img_size)
         max_threshold = (max_threshold  * dist[0]) + (max_threshold * track.score / (track.time_since_update + 1))
-    if (track.time_since_update >= max_threshold) or track.score < 0.4: 
+    if (track.time_since_update >= max_threshold): 
         return pred
     
     track.time_since_update += 1
