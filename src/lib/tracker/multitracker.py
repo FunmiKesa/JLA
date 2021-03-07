@@ -424,6 +424,8 @@ class JDETracker(object):
                 pred_futures[..., [1, 3]] -= dh
                 pred_futures[..., [0, 2]] -= dw
                 pred_futures /= ratio
+                pred_futures[..., [0,2]] = np.clip(pred_futures[..., [0,2]], 0, width)
+                pred_futures[..., [1,3]] = np.clip(pred_futures[..., [1,3]], 0, height)
 
                 # pred_futures_xywh = xyxy2xywh(pred_futures)
 
@@ -753,8 +755,9 @@ def forecast_track_in_frame(track, img_size=()):
     if forecast_index >= len(futures):
         return pred
     # track.forecast_index += track.time_since_update
-    
-    tlwh = STrack.tlbr_to_tlwh(futures[forecast_index])
+    tlbr = futures[forecast_index]
+  
+    tlwh = STrack.tlbr_to_tlwh(tlbr)
     pred = STrack(tlwh, track.score, track.smooth_feat, 30, past_length=track.past_length)
     return pred
 

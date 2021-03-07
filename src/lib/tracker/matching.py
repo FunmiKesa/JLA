@@ -155,7 +155,7 @@ def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.75, max_length=20):
         if len(track.forecasts) > 0:
             forecasts = track.forecasts[:max_length]
             f_dists = iou_distance(forecasts, dets)
-            i = np.argmax(f_dists < 0.3, axis=0)
+            i = np.argmax(f_dists < 0.5, axis=0)
             v = f_dists.T[np.arange(f_dists.shape[1]), i.squeeze()]
             d = (v * max_length / (max_length - i))  * dists[row]
             forecasts_inds[row] = i
