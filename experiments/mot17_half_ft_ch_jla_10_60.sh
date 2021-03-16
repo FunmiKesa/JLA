@@ -20,6 +20,6 @@ cd src
 # --world-size '1' \
 # --rank '0' \
 
-python track_half.py mot --load_model ../exp/mot/mot17_half_ft_crowd_jla_10_60/model_30.pth --conf_thres 0.4 --val_mot17 --exp_id mot17_half_ft_crowd_jla_10_60 --arch rnnforecast_34 --forecast --use_embedding --no_kf --past_length 10 --future_length 60
+python track_half.py mot --load_model ../exp/mot/mot17_half_ft_crowd_jla_10_60/model_30.pth --conf_thres 0.4 --val_mot17 --exp_id mot17_half_ft_ch_jla_10_60 --arch rnnforecast_34 --forecast --use_embedding --no_kf --past_length 10 --future_length 60
 
 cd ..
