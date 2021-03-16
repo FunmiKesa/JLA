@@ -165,7 +165,7 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
             opt.forecast_pred, seq, 'img1') if opt.forecast else None
         opt.forecast_dir = forecast_dir
         logger.info('start seq: {}'.format(seq))
-        print(data_root)
+        logger.info(data_root)
         dataloader = datasets.LoadImages(
             osp.join(data_root, seq, 'img1'), opt.img_size)
         result_filename = os.path.join(result_root, '{}.txt'.format(seq))
@@ -188,7 +188,7 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
             formatters=mh.formatters,
             namemap=mm.io.motchallenge_metric_names
         )
-        print(strsummary)
+        logger.info("\n"+strsummary)
         summary.to_csv(os.path.join(
         result_root, 'summary_{}.csv'.format(exp_name)))
 
@@ -198,18 +198,18 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
             future_label_root = osp.join(opt.forecast_root, seq, 'img1')
 
             from forecast_utils import evaluation
-            aiou, fiou, ade, fde = evaluation.eval_seq(future_label_root)
+            aiou, fiou, ade, fde = evaluation.eval_seq(future_label_root, pred_folder= f"pred_{exp_name}")
             aious.append(aiou)
             fious.append(fiou)
             ades.append(ade)
             fdes.append(fde)
 
-            print()
-            print(seq)
-            print('AIOU: ', round(aiou, 1))
-            print('FIOU: ', round(fiou, 1))
-            print('ADE:  ', round(ade, 1))
-            print('FDE:  ', round(fde, 1))
+            logger.info('\n')
+            logger.info(seq)
+            logger.info('AIOU: ', round(aiou, 1))
+            logger.info('FIOU: ', round(fiou, 1))
+            logger.info('ADE:  ', round(ade, 1))
+            logger.info('FDE:  ', round(fde, 1))
 
             filename = os.path.join(
             result_root, 'forecast_{}.csv'.format(exp_name))
@@ -237,7 +237,7 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
     #     formatters=mh.formatters,
     #     namemap=mm.io.motchallenge_metric_names
     # )
-    # print(strsummary)
+    # logger.info(strsummary)
     # Evaluator.save_summary(summary, os.path.join(
         # result_root, 'summary_{}.xlsx'.format(exp_name)))
     # summary.to_csv(os.path.join(
@@ -249,11 +249,11 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
         ade = round(np.mean(ades), 1)
         fde = round(np.mean(fdes), 1)
 
-        print('Mean')
-        print('AIOU: ', aiou)
-        print('FIOU: ', fiou)
-        print('ADE:  ', ade)
-        print('FDE:  ', fde)
+        logger.info('Mean')
+        logger.info('AIOU: ', aiou)
+        logger.info('FIOU: ', fiou)
+        logger.info('ADE:  ', ade)
+        logger.info('FDE:  ', fde)
 
         # filename = os.path.join(
             # result_root, 'forecast_{}.csv'.format(exp_name))
@@ -367,7 +367,7 @@ if __name__ == '__main__':
 
     if opt.forecast:
         opt.forecast_root = data_root.replace('images', 'future')
-        opt.forecast_pred = data_root.replace('images', 'pred')
+        opt.forecast_pred = data_root.replace('images', f'pred_{opt.exp_id}')
         mkdirs(opt.forecast_pred, del_existing=True)
     main(opt,
          data_root=data_root,
