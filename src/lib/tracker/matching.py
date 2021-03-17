@@ -148,10 +148,6 @@ def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.75, max_length=20):
     # trks = np.array([t.tlbr for t in tracks])
     # print(dists)
     for row, track in enumerate(tracks):
-        # t  = track.tlbr
-        # t = track.xywh[:2]
-        # d = 0.5 * ((t - dets).var(1) / (t.var() + dets.var(1) + 1e-8))
-        # d = d ** 0.5
         if len(track.forecasts) > 0:
             forecasts = track.forecasts[:max_length]
             f_dists = iou_distance(forecasts, dets)
@@ -185,6 +181,5 @@ def normalized_euclidean_distance(atracks, btracks):
     
         dist = 0.5 * ((axywh - bxywh).var( keepdims=True) / (axywh.var(keepdims=True) + bxywh.var( keepdims=True) + 1e-8))
         dists[i,i] = dist ** 0.5
-    # dists = np.sqrt(dists)
 
     return dists

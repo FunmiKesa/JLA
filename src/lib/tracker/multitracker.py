@@ -424,8 +424,8 @@ class JDETracker(object):
                 pred_futures[..., [1, 3]] -= dh
                 pred_futures[..., [0, 2]] -= dw
                 pred_futures /= ratio
-                pred_futures[..., [0,2]] = np.clip(pred_futures[..., [0,2]], 0, width)
-                pred_futures[..., [1,3]] = np.clip(pred_futures[..., [1,3]], 0, height)
+                # pred_futures[..., [0,2]] = np.clip(pred_futures[..., [0,2]], 0, width)
+                # pred_futures[..., [1,3]] = np.clip(pred_futures[..., [1,3]], 0, height)
 
                 # pred_futures_xywh = xyxy2xywh(pred_futures)
 
@@ -516,12 +516,12 @@ class JDETracker(object):
                 track.re_activate(det, self.frame_id, new_id=False)
                 refind_stracks.append(track)
 
-        # r_tracked_stracks = list(strack_pool)
+        r_tracked_stracks = list(strack_pool)
 
         ''' Step 3: Second association, with IOU'''
 
         detections = [detections[i] for i in u_detection]
-        r_tracked_stracks = [strack_pool[i] for i in u_track if strack_pool[i].state == TrackState.Tracked]
+        r_tracked_stracks = [strack_pool[i] for i in u_track if r_tracked_stracks[i].state == TrackState.Tracked]
         dists = matching.iou_distance(r_tracked_stracks, detections)
         matches, u_track, u_detection = matching.linear_assignment(dists, thresh=0.5)
 
