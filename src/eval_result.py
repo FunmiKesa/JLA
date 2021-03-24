@@ -3,7 +3,7 @@ import os
 from tracking_utils.evaluation import Evaluator
 import motmetrics as mm
 
-data_root = "../data/MOT17/images/train"
+data_root = "../data/MOT20/images/train"
 seqs = os.listdir(data_root)
 data_type = "mot"
 # seqs_str = '''Venice-2
@@ -23,7 +23,8 @@ data_type = "mot"
 accs = []
 
 for seq in seqs:
-    result_filename = f"../Archive/{seq}.txt"
+    print(seq)
+    result_filename = f"../data/JLA_Results/MOT20/{seq}.txt"
 
     evaluator = Evaluator(data_root, seq, data_type)
     accs.append(evaluator.eval_file(result_filename))
