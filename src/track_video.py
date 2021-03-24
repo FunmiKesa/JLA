@@ -45,9 +45,10 @@ def main(opt):
     logger.setLevel(logging.INFO)
     logger.info((str(sys.argv)))
     exp_name =  opt.exp_id
-    data_root = os.path.join(opt.data_dir, 'CityWalks/clips')
+    data_root = opt.data_dir
     result_root = os.path.join(data_root, '..', 'results', exp_name
     )
+   
     mkdirs(result_root)
 
     data_type = 'mot'
@@ -57,7 +58,10 @@ def main(opt):
     accs = []
     n_frame = 0
     timer_avgs, timer_calls = [], []
+        
     if opt.forecast:
+        opt.forecast_pred = data_root.replace('clips', f'pred_{opt.exp_id}')
+        mkdirs(opt.forecast_pred, del_existing=True)
         aious = []
         fious = []
         ades = []
@@ -68,7 +72,12 @@ def main(opt):
     opt.forecast_root = data_root.replace('clips', 'future')
     for i, seq in enumerate(seqs):
         data_root_seq = osp.join(data_root, seq)
-        for vid in os.listdir(data_root_seq):
+        for vid in sorted(os.listdir(data_root_seq)):
+            if '.mp4' not in vid:
+                continue
+            opt.input_video = osp.join(data_root, seq, vid)
+            print(opt.input_video)
+            vid = vid.replace('.mp4', '')
             opt.filename = f'{seq}_{vid}'
             logger.info('Starting tracking...')
             dataloader = datasets.LoadVideo(opt.input_video, opt.img_size)
@@ -76,12 +85,10 @@ def main(opt):
             frame_rate = dataloader.frame_rate
 
             frame_dir = None if opt.output_format == 'text' else osp.join(result_root, 'frame', opt.filename)
-            forecast_dir = os.path.join('./pred') if opt.forecast else None
+            forecast_dir = os.path.join(opt.forecast_pred, opt.filename) if opt.forecast else None
             opt.forecast_dir = forecast_dir
             nf, ta, tc =eval_seq(opt, dataloader, 'mot', result_filename,
                     save_dir=frame_dir, show_image=False, frame_rate=frame_rate)
-
-           
 
             n_frame += nf
             timer_avgs.append(ta)
@@ -89,7 +96,7 @@ def main(opt):
 
             # eval
             logger.info('Evaluate seq: {}'.format(seq))
-            evaluator = Evaluator(data_root, opt.filename, data_type)
+            evaluator = Evaluator(data_root_seq, vid, data_type)
             accs.append(evaluator.eval_file(result_filename))
             vids += [vid]
             summary = Evaluator.get_summary(accs, vids, metrics)
