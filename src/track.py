@@ -206,10 +206,10 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
 
             logger.info('\n')
             logger.info(seq)
-            logger.info('AIOU: ' + round(aiou, 1))
-            logger.info('FIOU: ' + round(fiou, 1))
-            logger.info('ADE:  ' + round(ade, 1))
-            logger.info('FDE:  ' + round(fde, 1))
+            logger.info('AIOU: ' + str(round(aiou, 1)))
+            logger.info('FIOU: ' + str(round(fiou, 1)))
+            logger.info('ADE:  ' + str(round(ade, 1)))
+            logger.info('FDE:  ' + str(round(fde, 1)))
 
             filename = os.path.join(
             result_root, 'forecast_{}.csv'.format(exp_name))
@@ -250,10 +250,10 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
         fde = round(np.mean(fdes), 1)
 
         logger.info('Mean')
-        logger.info('AIOU: ' + aiou)
-        logger.info('FIOU: ' + fiou)
-        logger.info('ADE:  ' + ade)
-        logger.info('FDE:  ' + fde)
+        logger.info('AIOU: ' + str(aiou))
+        logger.info('FIOU: ' + str(fiou))
+        logger.info('ADE:  ' + str(ade))
+        logger.info('FDE:  ' + str(fde))
 
         # filename = os.path.join(
             # result_root, 'forecast_{}.csv'.format(exp_name))
