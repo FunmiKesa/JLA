@@ -5,7 +5,8 @@ import pandas as pd
 import glob
 import cv2
 from data_utils import *
-
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import multiprocessing
 
 def gen_past_files(seq_label_root, past_label_root, past_length=30, img_size=None):
     if not osp.exists(seq_label_root):
@@ -79,98 +80,139 @@ def gen_past_files(seq_label_root, past_label_root, past_length=30, img_size=Non
             with open(label_fpath, 'a+') as f:
                 f.write(label_str)
 
+def main(d, past_label, past_length):
+    try:
+        print("\n", d)
+        seq_label = ''
+
+        if 'MOT' in d:
+            seq_label = 'img1'
+            seq_root = f'data/{d}/images/train'
+            label_root = f'data/{d}/labels_with_ids/train'
+            seqs = os.listdir(label_root)
+            for seq in seqs:
+                print(seq)
+                img_size = None
+                seq_info_file = osp.join(seq_root, seq, 'seqinfo.ini')
+                if osp.exists(seq_info_file):
+                    seq_info = open(
+                        osp.join(seq_root, seq, 'seqinfo.ini')).read()
+                    seq_width = int(seq_info[seq_info.find(
+                        'imWidth=') + 8:seq_info.find('\nimHeight')])
+                    seq_height = int(seq_info[seq_info.find(
+                        'imHeight=') + 9:seq_info.find('\nimExt')])
+
+                    img_size = (seq_height, seq_width)
+
+                seq_label_root = osp.join(label_root, seq, seq_label)
+                past_label_root = seq_label_root.replace(
+                    'labels_with_ids', past_label)
+
+                if osp.exists(past_label_root):
+                    continue
+
+                gen_past_files(seq_label_root, past_label_root,
+                                past_length, img_size)
+
+        elif 'CityWalks' in d:
+            seq_root = f'data/{d}/images'
+            root = f'data/{d}/labels_with_ids'
+            img_size = (720, 1280)
+
+            parent_seqs = sorted(os.listdir(root))
+            for p_seq in parent_seqs:
+                print(p_seq)
+                label_root = osp.join(root, p_seq)
+
+                seqs = sorted(os.listdir(label_root))
+                for seq in seqs:
+                    print(seq)
+
+                    seq_label_root = osp.join(label_root, seq, seq_label)
+                    past_label_root = seq_label_root.replace(
+                    'labels_with_ids', past_label)
+
+                    if osp.exists(past_label_root):
+                        continue
+
+                    gen_past_files(seq_label_root, past_label_root,
+                                past_length, img_size)
+
+        elif 'Caltech' in d:
+            seq_root = f'data/{d}/images'
+            label_root = f'data/{d}/labels_with_ids'
+            img_size = (480, 640)
+
+            past_label_root = label_root.replace(
+                'labels_with_ids', past_label)
+
+            gen_past_files(label_root, past_label_root, past_length,
+                            img_size)
+
+        elif 'PRW' in d:
+            seq_root = f'data/{d}/images'
+            label_root = f'data/{d}/labels_with_ids'
+            img_size = (1080, 1920)
+
+            past_label_root = label_root.replace(
+                'labels_with_ids', past_label)
+
+            gen_past_files(label_root, past_label_root, past_length,
+                            img_size)
+        elif 'crowdhuman' in d:
+            seq_root = f'data/{d}/images/val'
+            label_root = f'data/{d}/labels_with_ids/val'
+            img_size = None
+
+            past_label_root = label_root.replace(
+                'labels_with_ids', past_label)
+
+            gen_past_files(label_root, past_label_root, past_length,
+                            img_size)
+        else:
+            print('Data format not know')
+
+    except Exception as ex:
+        print(d, ' failed due to ', ex)
+
+import sys
+def print_progress(iteration, total, prefix='', suffix='', decimals=3, bar_length=100):
+    """
+    Call in a loop to create standard out progress bar
+    :param iteration: current iteration
+    :param total: total iterations
+    :param prefix: prefix string
+    :param suffix: suffix string
+    :param decimals: positive number of decimals in percent complete
+    :param bar_length: character length of bar
+    :return: None
+    """
+
+    format_str = "{0:." + str(decimals) + "f}"  # format the % done number string
+
+    percents = format_str.format(100 * (iteration / float(total)))  # calculate the % done
+    filled_length = int(round(bar_length * iteration / float(total)))  # calculate the filled bar length
+    bar = '#' * filled_length + '-' * (bar_length - filled_length)  # generate the bar string
+    sys.stdout.write('\r%s |%s| %s%s %s' % (prefix, bar, percents, '%', suffix)),  # write out the bar
+    sys.stdout.flush()  # flush to stdout
 
 if __name__ == "__main__":
-    datasets = ["PRW", "Caltech", "MOT15", "MOT16", "MOT17", "MOT20"]
-    datasets = ["CityWalks","PRW","Caltech"]
+    datasets = ["CityWalks", "PRW", "Caltech", "MOT15", "MOT16", "MOT17", "MOT20"]
+    datasets = ["CityWalks"]
 
     past_label = 'past'
     past_length = 30
     for d in datasets:
-        try:
-            print("\n", d)
-            seq_label = ''
+    
+        prefix_str = f"{d}"
 
-            if 'MOT' in d:
-                seq_label = 'img1'
-                seq_root = f'data/{d}/images/train'
-                label_root = f'data/{d}/labels_with_ids/train'
-                seqs = os.listdir(label_root)
-                for seq in seqs:
-                    print(seq)
-                    img_size = None
-                    seq_info_file = osp.join(seq_root, seq, 'seqinfo.ini')
-                    if osp.exists(seq_info_file):
-                        seq_info = open(
-                            osp.join(seq_root, seq, 'seqinfo.ini')).read()
-                        seq_width = int(seq_info[seq_info.find(
-                            'imWidth=') + 8:seq_info.find('\nimHeight')])
-                        seq_height = int(seq_info[seq_info.find(
-                            'imHeight=') + 9:seq_info.find('\nimExt')])
+        with ProcessPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
 
-                        img_size = (seq_height, seq_width)
+            futures = [executor.submit(main, d, past_label, past_length)
+                    for f in range(10)]  # submit the processes: extract_frames(...)
 
-                    seq_label_root = osp.join(label_root, seq, seq_label)
-                    past_label_root = seq_label_root.replace(
-                        'labels_with_ids', past_label)
+            for i, f in enumerate(as_completed(futures)):  # as each process completes
+                print_progress(i, 10-1, prefix=prefix_str, suffix='Complete')  # print it's progress
 
-                    gen_past_files(seq_label_root, past_label_root,
-                                   past_length, img_size)
 
-            elif 'CityWalks' in d:
-                seq_root = f'data/{d}/images'
-                root = f'data/{d}/labels_with_ids'
-                img_size = (720, 1280)
-
-                parent_seqs = sorted(os.listdir(root))
-                for p_seq in parent_seqs:
-                    print(p_seq)
-                    label_root = osp.join(root, p_seq)
-
-                    seqs = sorted(os.listdir(label_root))
-                    for seq in seqs:
-                        print(seq)
-
-                        seq_label_root = osp.join(label_root, seq, seq_label)
-                        past_label_root = seq_label_root.replace(
-                        'labels_with_ids', past_label)
-
-                        gen_past_files(seq_label_root, past_label_root,
-                                   past_length, img_size)
-
-            elif 'Caltech' in d:
-                seq_root = f'data/{d}/images'
-                label_root = f'data/{d}/labels_with_ids'
-                img_size = (480, 640)
-
-                past_label_root = label_root.replace(
-                    'labels_with_ids', past_label)
-
-                gen_past_files(label_root, past_label_root, past_length,
-                               img_size)
-
-            elif 'PRW' in d:
-                seq_root = f'data/{d}/images'
-                label_root = f'data/{d}/labels_with_ids'
-                img_size = (1080, 1920)
-
-                past_label_root = label_root.replace(
-                    'labels_with_ids', past_label)
-
-                gen_past_files(label_root, past_label_root, past_length,
-                               img_size)
-            elif 'crowdhuman' in d:
-                seq_root = f'data/{d}/images/val'
-                label_root = f'data/{d}/labels_with_ids/val'
-                img_size = None
-
-                past_label_root = label_root.replace(
-                    'labels_with_ids', past_label)
-
-                gen_past_files(label_root, past_label_root, past_length,
-                               img_size)
-            else:
-                print('Data format not know')
-
-        except Exception as ex:
-            print(d, ' failed due to ', ex)
+        

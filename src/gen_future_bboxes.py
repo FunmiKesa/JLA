@@ -5,6 +5,8 @@ import pandas as pd
 import glob
 import cv2
 from data_utils import *
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import multiprocessing
 
 
 def gen_future_files(seq_label_root, future_label_root, future_length=60, img_size=None):
@@ -81,88 +83,130 @@ def gen_future_files(seq_label_root, future_label_root, future_length=60, img_si
             with open(label_fpath, 'a+') as f:
                 f.write(label_str)
 
+def main(d, future_label, future_length):
+    try:
+        print("\n", d)
+        seq_label = ''
 
-if __name__ == "__main__":
-    datasets = ["PRW", "Caltech","CityWalks",  "MOT15", "MOT16", "MOT17", "MOT20"]
-    datasets = ["PRW", "Caltech"]
-    future_label = 'future'
-    future_length = 60
-    for d in datasets:
-        try:
-            print("\n", d)
-            seq_label = ''
+        if 'MOT' in d:
+            seq_label = 'img1'
+            seq_root = f'data/{d}/images/train'
+            label_root = f'data/{d}/labels_with_ids/train'
 
-            if 'MOT' in d:
-                seq_label = 'img1'
-                seq_root = f'data/{d}/images/train'
-                label_root = f'data/{d}/labels_with_ids/train'
+            seqs = os.listdir(label_root)
+            for seq in seqs:
+                print(seq)
+                img_size = None
+                seq_info_file = osp.join(seq_root, seq, 'seqinfo.ini')
+                if osp.exists(seq_info_file):
+                    seq_info = open(
+                        osp.join(seq_root, seq, 'seqinfo.ini')).read()
+                    seq_width = int(seq_info[seq_info.find(
+                        'imWidth=') + 8:seq_info.find('\nimHeight')])
+                    seq_height = int(seq_info[seq_info.find(
+                        'imHeight=') + 9:seq_info.find('\nimExt')])
 
-                seqs = os.listdir(label_root)
+                    img_size = (seq_height, seq_width)
+
+                seq_label_root = osp.join(label_root, seq, seq_label)
+                future_label_root = seq_label_root.replace(
+                    'labels_with_ids', future_label)
+                
+                if osp.exists(future_label_root):
+                        continue
+
+                gen_future_files(seq_label_root, future_label_root,
+                                    future_length, img_size)
+        elif 'CityWalks' in d:
+            seq_root = f'data/{d}/images'
+            root = f'data/{d}/labels_with_ids'
+            img_size = (720, 1280)
+
+            parent_seqs = sorted(os.listdir(root), reverse=True)
+            for p_seq in parent_seqs:
+                print(p_seq)
+                p_label_root = osp.join(root, p_seq)
+
+                seqs = sorted(os.listdir(p_label_root))
                 for seq in seqs:
                     print(seq)
-                    img_size = None
-                    seq_info_file = osp.join(seq_root, seq, 'seqinfo.ini')
-                    if osp.exists(seq_info_file):
-                        seq_info = open(
-                            osp.join(seq_root, seq, 'seqinfo.ini')).read()
-                        seq_width = int(seq_info[seq_info.find(
-                            'imWidth=') + 8:seq_info.find('\nimHeight')])
-                        seq_height = int(seq_info[seq_info.find(
-                            'imHeight=') + 9:seq_info.find('\nimExt')])
 
-                        img_size = (seq_height, seq_width)
-
-                    seq_label_root = osp.join(label_root, seq, seq_label)
+                    seq_label_root = osp.join(p_label_root, seq)
                     future_label_root = seq_label_root.replace(
                         'labels_with_ids', future_label)
+                    
+                    if osp.exists(future_label_root):
+                        continue
 
                     gen_future_files(seq_label_root, future_label_root,
-                                     future_length, img_size)
-            elif 'CityWalks' in d:
-                seq_root = f'data/{d}/images'
-                root = f'data/{d}/labels_with_ids'
-                img_size = (720, 1280)
+                                    future_length, img_size)
 
-                parent_seqs = sorted(os.listdir(root))
-                for p_seq in parent_seqs:
-                    print(p_seq)
-                    p_label_root = osp.join(root, p_seq)
+        elif 'Caltech' in d:
+            seq_root = f'data/{d}/images'
+            label_root = f'data/{d}/labels_with_ids'
+            img_size = (480, 640)
 
-                    seqs = sorted(os.listdir(p_label_root))
-                    for seq in seqs:
-                        print(seq)
-                        
+            future_label_root = label_root.replace(
+                'labels_with_ids', future_label)
+            
+            gen_future_files(label_root, future_label_root, future_length,
+                                img_size)
 
-                        seq_label_root = osp.join(p_label_root, seq)
-                        future_label_root = seq_label_root.replace(
-                            'labels_with_ids', future_label)
+        elif 'PRW' in d:
+            seq_root = f'data/{d}/images'
+            label_root = f'data/{d}/labels_with_ids'
 
-                        gen_future_files(seq_label_root, future_label_root,
-                                        future_length, img_size)
+            img_size = (1080, 1920)
+            future_label_root = label_root.replace(
+                'labels_with_ids', future_label)
 
-            elif 'Caltech' in d:
-                seq_root = f'data/{d}/images'
-                label_root = f'data/{d}/labels_with_ids'
-                img_size = (480, 640)
+            gen_future_files(label_root, future_label_root, future_length,
+                                img_size)
+        else:
+            print('Data format not known.')
 
-                future_label_root = label_root.replace(
-                    'labels_with_ids', future_label)
+    except Exception as ex:
+        print(d, ' failed due to ', ex)
 
-                gen_future_files(label_root, future_label_root, future_length,
-                                 img_size)
+import sys
+def print_progress(iteration, total, prefix='', suffix='', decimals=3, bar_length=100):
+    """
+    Call in a loop to create standard out progress bar
+    :param iteration: current iteration
+    :param total: total iterations
+    :param prefix: prefix string
+    :param suffix: suffix string
+    :param decimals: positive number of decimals in percent complete
+    :param bar_length: character length of bar
+    :return: None
+    """
 
-            elif 'PRW' in d:
-                seq_root = f'data/{d}/images'
-                label_root = f'data/{d}/labels_with_ids'
+    format_str = "{0:." + str(decimals) + "f}"  # format the % done number string
 
-                img_size = (1080, 1920)
-                future_label_root = label_root.replace(
-                    'labels_with_ids', future_label)
+    percents = format_str.format(100 * (iteration / float(total)))  # calculate the % done
+    filled_length = int(round(bar_length * iteration / float(total)))  # calculate the filled bar length
+    bar = '#' * filled_length + '-' * (bar_length - filled_length)  # generate the bar string
+    sys.stdout.write('\r%s |%s| %s%s %s' % (prefix, bar, percents, '%', suffix)),  # write out the bar
+    sys.stdout.flush()  # flush to stdout
 
-                gen_future_files(label_root, future_label_root, future_length,
-                                 img_size)
-            else:
-                print('Data format not known.')
 
-        except Exception as ex:
-            print(d, ' failed due to ', ex)
+if __name__ == "__main__":
+    datasets = ["CityWalks", "PRW", "Caltech","CityWalks",  "MOT15", "MOT16", "MOT17", "MOT20"]
+    datasets = ["CityWalks"]
+    future_label = 'future'
+    future_length = 60
+
+    for d in datasets:
+
+        prefix_str = f"{d}"
+
+        with ProcessPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
+
+            futures = [executor.submit(main, d, future_label, future_length)
+                    for f in range(10)]  # submit the processes: extract_frames(...)
+
+            for i, f in enumerate(as_completed(futures)):  # as each process completes
+                print_progress(i, 10-1, prefix=prefix_str, suffix='Complete')  # print it's progress
+
+
+   
