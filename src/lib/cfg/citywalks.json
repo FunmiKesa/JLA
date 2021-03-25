@@ -1,0 +1,15 @@
+{
+    "root":"../data",
+    "train":
+    {
+        "citywalks":"./data/citywalks.train"
+    },
+    "test_emb":
+    {
+        "citywalks":"./data/citywalks.train"
+    },
+    "test":
+    {
+        "citywalks":"./data/citywalks.train"
+    }
+}
