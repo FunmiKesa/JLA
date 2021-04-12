@@ -424,8 +424,8 @@ class JDETracker(object):
                 pred_futures[..., [1, 3]] -= dh
                 pred_futures[..., [0, 2]] -= dw
                 pred_futures /= ratio
-                # pred_futures[..., [0,2]] = np.clip(pred_futures[..., [0,2]], 0, width)
-                # pred_futures[..., [1,3]] = np.clip(pred_futures[..., [1,3]], 0, height)
+                pred_futures[..., [0,2]] = np.clip(pred_futures[..., [0,2]], 0, width)
+                pred_futures[..., [1,3]] = np.clip(pred_futures[..., [1,3]], 0, height)
 
                 # pred_futures_xywh = xyxy2xywh(pred_futures)
 
