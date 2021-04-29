@@ -424,8 +424,8 @@ class JDETracker(object):
                 pred_futures[..., [1, 3]] -= dh
                 pred_futures[..., [0, 2]] -= dw
                 pred_futures /= ratio
-                pred_futures[..., [0,2]] = np.clip(pred_futures[..., [0,2]], 0, width)
-                pred_futures[..., [1,3]] = np.clip(pred_futures[..., [1,3]], 0, height)
+                # pred_futures[..., [0,2]] = np.clip(pred_futures[..., [0,2]], 0, width)
+                # pred_futures[..., [1,3]] = np.clip(pred_futures[..., [1,3]], 0, height)
 
                 # pred_futures_xywh = xyxy2xywh(pred_futures)
 
@@ -496,17 +496,19 @@ class JDETracker(object):
             STrack.multi_predict(strack_pool)
             dists = matching.fuse_motion(
                 self.kalman_filter, dists, strack_pool, detections)
-        else:
+        elif self.forecast:
             #fuse short term motion
             r_tracked_stracks = list(strack_pool)
             dists, forecasts_inds = matching.fuse_motion2(dists, r_tracked_stracks, detections)
+
         matches, u_track, u_detection = matching.linear_assignment(
                 dists, thresh=0.4)
 
         for itracked, idet in matches:
             track = strack_pool[itracked]
             det = detections[idet]
-            track.forecast_index = int(forecasts_inds[itracked, idet])
+            if self.forecast:
+                track.forecast_index = int(forecasts_inds[itracked, idet])
             track.time_since_update = 0
 
             if track.state == TrackState.Tracked:
@@ -539,7 +541,7 @@ class JDETracker(object):
                 refind_stracks.append(track)
 
         ''' Use forecast predictions'''
-        if not self.use_kf:
+        if self.forecast:
             r_tracked_stracks = [r_tracked_stracks[i] for i in u_track if r_tracked_stracks[i].state == TrackState.Tracked]
             forecasts, inds = get_forecast_distance(r_tracked_stracks, (width, height))
             # forecasts, inds = get_forecast(r_tracked_stracks)
@@ -630,19 +632,19 @@ class JDETracker(object):
             [track.track_id for track in removed_stracks]))
 
         viz = False
-        # viz = True
-        # focus = [2, 7, 1, 29]
+        viz = True
+        focus = [0, 2, 5, 7, 1, 29]
         if viz and (self.frame_id % 1 == 0) :
             os.environ['DISPLAY'] = 'localhost:11.0'
             cv2.namedWindow("forecasts",cv2.WINDOW_NORMAL)
             img = img0.copy()
             tl = round(0.0004 * max(img.shape[0:2])) + 1
             tf = max(tl - 1, 1)  # font thickness
-            colors  = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
+            colors  = [(0, 255, 251), (0, 255, 0), (0, 0, 255)]
 
             tracks = output_stracks+ detections_copy  + lost_stracks
             for t in tracks:
-                if t.track_id not in range(10):
+                if (t.track_id not in focus):
                     continue
 
                 bbox = t.tlbr
@@ -663,9 +665,10 @@ class JDETracker(object):
                 # cv2.rectangle(img, c1, c2, color, -1)
                 cv2.putText(img, label, (c1[0], c1[1] - 2), 0, tl / 3,
                             color, thickness=tf, lineType=cv2.LINE_AA)
-                color = (255, 255, 23)
-                if len(t.forecasts):
-                    bbox_pred = t.forecasts[t.forecast_index]
+                color = (255, 255, 0)
+                if t.state == 2 and len(t.forecasts):
+                    ind =(track.forecast_index + 1) * track.time_since_update
+                    bbox_pred = t.forecasts[ind]
                     bbox_pred = [int(v) for v in bbox_pred]
                     cv2.rectangle(
                         img, (bbox_pred[0], bbox_pred[1]), (bbox_pred[2], bbox_pred[3]), color, 2)
@@ -699,11 +702,7 @@ def frame_distance(xywh, img_size):
 
     xywh = np.array(xywh)
     # calculate the distance of the object with respect to the center of the frame
-    dist = (centerx - np.linalg.norm(xywh[:,:2] - center, axis=1)) / centerx
-
-
-    # print(dist)
-    # dist = np.minimum(1.0,  dist / frame_width)
+    dist = np.linalg.norm(xywh[:,:2] - center, axis=1) / centerx
 
     return  dist
  
@@ -741,22 +740,30 @@ def forecast_track_in_frame(track, img_size=()):
     max_threshold = 20
     if track.tracklet_len < 10:
         return pred
+
     
+    f = (track.time_since_update + 1)/ max_threshold
+    lambda_ = 0.5
+    thres = lambda_ + (1)
+    track.time_since_update += 1
 
     if len(img_size):
-        dist = frame_distance([track.xywh], img_size)
-        max_threshold = (max_threshold  * dist[0]) + (max_threshold * track.score / (track.time_since_update + 1))
-    if (track.time_since_update >= max_threshold): 
+        dist = frame_distance([track.xywh], img_size)[0]
+        print(f, dist, track.time_since_update, track.track_id)
+        f = lambda_  * dist + (1-lambda_)  * f
+        # max_threshold = (max_threshold  * dist) / (track.time_since_update + 1) # + (max_threshold * track.score / (track.time_since_update + 1))
+    # if (track.time_since_update >= max_threshold): 
+    print(f)
+    if f > 0.55:
         return pred
     
-    track.time_since_update += 1
     
     forecast_index = (track.forecast_index + 1) * track.time_since_update
     if forecast_index >= len(futures):
         return pred
     # track.forecast_index += track.time_since_update
     tlbr = futures[forecast_index]
-  
+    # track.forecast_index   =   forecast_index
     tlwh = STrack.tlbr_to_tlwh(tlbr)
     pred = STrack(tlwh, track.score, track.smooth_feat, 30, past_length=track.past_length)
     return pred
