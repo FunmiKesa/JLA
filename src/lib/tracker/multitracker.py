@@ -43,6 +43,7 @@ class STrack(BaseTrack):
         self.pasts = deque([], maxlen=past_length)
         self.alpha = 0.9
         self.forecasts = []
+        self.forecast_score = 0
         self.forecast_index = 0
         self.use_kf = use_kf
 
@@ -135,13 +136,10 @@ class STrack(BaseTrack):
         else:
 
             # use forecast 
+            self._tlwh = new_tlwh
             if len(self.forecasts):
                 if use_forecast:
                     self._tlwh = STrack.tlbr_to_tlwh(np.asarray([self.forecasts[self.forecast_index], new_track.tlbr]).mean(axis=0))
-                else:
-                    self._tlwh = new_tlwh
-
-                    
 
         self.state = TrackState.Tracked
         self.is_activated = True
@@ -378,10 +376,9 @@ class JDETracker(object):
                     # bbox_xyxy[..., [0,2]] *= rw
                     # bbox_xyxy[..., [1,3]] *= rh
 
-                    labels = labels[:, 1:, :]
 
                     pasts[:labels_change.shape[0], :, 4:] = labels_change
-                    pasts[:labels_change.shape[0], :, :4] = labels
+                    pasts[:labels_change.shape[0], :, :4] = labels[:, 1:, :]
                     # mask = pasts_mask.unsqueeze(-1).expand_as(self.pasts).float()
                     # self.pasts *= mask
 
@@ -431,6 +428,30 @@ class JDETracker(object):
 
 
                 # self.post_process(xywh2xyxy(pred_futures), meta)
+
+                pred_pasts = output['fct'][0]
+                pred_pasts =  pred_pasts.cpu().numpy()
+                pred_pasts = np.flip(pred_pasts, 1)[:objs_count]
+
+                # get  scores
+                pred_pasts = pred_pasts * pasts_mask[:objs_count, :, np.newaxis]
+                # pasts = pasts * pasts_mask
+                last_bbox = pred_pasts[:,:1, :4]
+                actual = labels.copy()
+                actual = np.flip(actual, 1)
+
+                actual[:, 1:, :] *= pasts_mask[:objs_count, :, np.newaxis]
+                pred_bboxes = pred_pasts[:,:,4:] + pred_pasts[:,:,:4]
+
+                pred_bboxes = np.concatenate((last_bbox, pred_bboxes), axis=1)
+                pred_bboxes = xywh2xyxy(pred_bboxes.copy())
+                actual = xywh2xyxy(actual.copy())
+
+                scores = []
+
+                for i in range(objs_count):
+                    score = matching.iou_distance(pred_bboxes[i], actual[i]).mean()
+                    scores.append(score) 
 
         dets = self.post_process(dets, meta)
         dets = self.merge_outputs([dets])[1]
