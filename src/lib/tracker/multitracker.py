@@ -757,24 +757,22 @@ def forecast_track_in_frame(track, img_size=()):
     futures = track.forecasts
     # if len(futures) < 10: 
     #     return pred
+    track.time_since_update += 1
 
     max_threshold = 20
-    if track.tracklet_len < 10:
+    if (track.tracklet_len + len(track.pasts)) < 15:
         return pred
 
     
-    f = (track.time_since_update + 1)/ max_threshold
+    f = (track.time_since_update)/ max_threshold
     lambda_ = 0.5
-    thres = lambda_ + (1)
-    track.time_since_update += 1
-
     if len(img_size):
         dist = frame_distance([track.xywh], img_size)[0]
-        print(f, dist, track.time_since_update, track.track_id)
+        # print(f, dist, track.time_since_update, track.track_id)
         f = lambda_  * dist + (1-lambda_)  * f
         # max_threshold = (max_threshold  * dist) / (track.time_since_update + 1) # + (max_threshold * track.score / (track.time_since_update + 1))
     # if (track.time_since_update >= max_threshold): 
-    print(f)
+    # print(f)
     if f > 0.55:
         return pred
     
