@@ -429,29 +429,39 @@ class JDETracker(object):
 
                 # self.post_process(xywh2xyxy(pred_futures), meta)
 
-                pred_pasts = output['fct'][0]
-                pred_pasts =  pred_pasts.cpu().numpy()
-                pred_pasts = np.flip(pred_pasts, 1)[:objs_count]
+                # pred_pasts = output['fct'][0]
+                # pred_pasts =  pred_pasts.cpu().numpy()
+                # pred_pasts = np.flip(pred_pasts, 1)[:objs_count]
 
-                # get  scores
-                pred_pasts = pred_pasts * pasts_mask[:objs_count, :, np.newaxis]
-                # pasts = pasts * pasts_mask
-                last_bbox = pred_pasts[:,:1, :4]
-                actual = labels.copy()
-                actual = np.flip(actual, 1)
+                # # get  scores
+                # pred_pasts = pred_pasts * pasts_mask[:objs_count, :, np.newaxis]
+                # # pasts = pasts * pasts_mask
+                # last_bbox = pred_pasts[:,:1, :4]
+                # actual = labels.copy()
+                # actual = np.flip(actual, 1)
 
-                actual[:, 1:, :] *= pasts_mask[:objs_count, :, np.newaxis]
-                pred_bboxes = pred_pasts[:,:,4:] + pred_pasts[:,:,:4]
+                # actual[:, 1:, :] *= pasts_mask[:objs_count, :, np.newaxis]
+                # pred_bboxes = pred_pasts[:,:,4:] + pred_pasts[:,:,:4]
 
-                pred_bboxes = np.concatenate((last_bbox, pred_bboxes), axis=1)
-                pred_bboxes = xywh2xyxy(pred_bboxes.copy())
-                actual = xywh2xyxy(actual.copy())
+                # pred_bboxes = np.concatenate((last_bbox, pred_bboxes), axis=1)
+                # pred_bboxes[..., [0, 2]] /= output_w
+                # pred_bboxes[..., [1, 3]] /= output_h
+                # pred_bboxes[..., [1, 3]] *= inp_height
+                # pred_bboxes[..., [0, 2]] *= inp_width
+                # pred_bboxes = xywh2xyxy(pred_bboxes.copy())
+                # pred_bboxes[..., [1, 3]] -= dh
+                # pred_bboxes[..., [0, 2]] -= dw
+                # pred_bboxes /= ratio
 
-                scores = []
+                # # actual = xywh2xyxy(actual.copy())
+                # actual = bboxes.copy()
 
-                for i in range(objs_count):
-                    score = matching.iou_distance(pred_bboxes[i], actual[i]).mean()
-                    scores.append(score) 
+
+                # scores = []
+
+                # for i in range(objs_count):
+                #     score = 1 - np.mean([matching.iou_distance(pred_bboxes[i, j:j+1], actual[i, j:j+1]) for j in range(int(pasts_mask[i].sum())+1)])
+                #     scores.append(score) 
 
         dets = self.post_process(dets, meta)
         dets = self.merge_outputs([dets])[1]
@@ -478,12 +488,18 @@ class JDETracker(object):
                 cv2.waitKey(1)
         # id0 = id0-1
         # '''
+        keys = list(selected_strack.keys())
         if len(selected_strack) > 0:
-            for i, tid in enumerate(selected_strack):
+            for i, tid in enumerate(keys):
                 t = selected_strack[tid]
                 forecasts = pred_futures[i]
+                # if scores[i] < 0.2:
+                #     print(t, scores[i], t.forecast_score, t.score, t.forecast_index)
+                #     t.forecast_index += 1
+                #     continue
+
                 t.forecasts = forecasts
-                # t.forecast_index = 0
+                # t.forecast_score = scores[i]
 
         if len(dets) > 0:
             '''Detections'''
@@ -653,7 +669,7 @@ class JDETracker(object):
             [track.track_id for track in removed_stracks]))
 
         viz = False
-        viz = True
+        # viz = True
         focus = [0, 2, 5, 7, 1, 29]
         if viz and (self.frame_id % 1 == 0) :
             os.environ['DISPLAY'] = 'localhost:11.0'
@@ -763,27 +779,31 @@ def forecast_track_in_frame(track, img_size=()):
     if (track.tracklet_len + len(track.pasts)) < 15:
         return pred
 
-    
-    f = (track.time_since_update)/ max_threshold
+    forecast_index = (track.forecast_index + 1) * track.time_since_update
+    if forecast_index >= len(futures):
+        return pred
+
+    tlbr = futures[forecast_index]
+    tlwh = STrack.tlbr_to_tlwh(tlbr)
+    xywh = tlwh.copy()
+    xywh[0] += xywh[2] / 2
+    xywh[1] += xywh[3] / 2
+
+    # f = (1-track.forecast_score) * (track.time_since_update)/ max_threshold
+    tsu = track.time_since_update/max_threshold 
+
     lambda_ = 0.5
     if len(img_size):
-        dist = frame_distance([track.xywh], img_size)[0]
-        # print(f, dist, track.time_since_update, track.track_id)
-        f = lambda_  * dist + (1-lambda_)  * f
-        # max_threshold = (max_threshold  * dist) / (track.time_since_update + 1) # + (max_threshold * track.score / (track.time_since_update + 1))
-    # if (track.time_since_update >= max_threshold): 
-    # print(f)
+        f_dist = frame_distance([xywh], img_size)[0]
+        f = lambda_  * f_dist + (1-lambda_)  * tsu
+
     if f > 0.55:
         return pred
     
     
-    forecast_index = (track.forecast_index + 1) * track.time_since_update
-    if forecast_index >= len(futures):
-        return pred
+    
     # track.forecast_index += track.time_since_update
-    tlbr = futures[forecast_index]
     # track.forecast_index   =   forecast_index
-    tlwh = STrack.tlbr_to_tlwh(tlbr)
     pred = STrack(tlwh, track.score, track.smooth_feat, 30, past_length=track.past_length)
     return pred
 

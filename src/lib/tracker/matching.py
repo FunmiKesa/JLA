@@ -135,34 +135,26 @@ def fuse_motion(kf, cost_matrix, tracks, detections, only_position=False, lambda
         cost_matrix[row] = lambda_ * cost_matrix[row] + (1 - lambda_) * gating_distance
     return cost_matrix
 
-def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.75, max_length=20):
+def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.75, max_length=10):
     forecasts_inds = np.zeros((len(tracks), len(detections)), dtype=np.int)
 
     if cost_matrix.size == 0:
         return cost_matrix, forecasts_inds
     dists = iou_distance(tracks, detections)
     dets = np.array([d.tlbr for d in detections])
-    # dets = np.array([d.xywh[:2] for d in detections])
-
-    # trks = np.array([t.tlbr for t in tracks])
-    # print(dists)
     for row, track in enumerate(tracks):
         d = dists[row]
-        # factor = np.ones_like(cost_matrix[row])
-        # factor[d >= 1] *= 2
-
-        if len(track.forecasts) > 0:
-            forecasts = track.forecasts[:max_length]
+        if (len(track.forecasts) > 0):
+            c=max_length+track.time_since_update+track.forecast_index
+            forecasts = track.forecasts[:c]
             f_dists = iou_distance(forecasts, dets)
+            m = f_dists.argmin(axis=0)
+            v = f_dists.min(axis=0)
             i = np.argmax(f_dists < 0.5, axis=0)
-            v = f_dists.T[np.arange(f_dists.shape[1]), i.squeeze()]
-            factor = max_length *  1.0 / (max_length - i)
-            #scale factor to range [1,2]
-            r = (1,2)
-            factor = ((factor - 1)/(max_length - 1) * (r[1] - r[0])) + r[0] 
-            d = (v * factor) * dists[row]
-            # d = 0.5 * (d + v * factor) 
+            d *= v
             forecasts_inds[row] = i
+        # if track.forecast_score > 0.5:
+        #     print(track, track.forecast_score, track.score, track.time_since_update, "\nd: ", d, "\ncost: ", cost_matrix[row])
 
         cost_matrix[row, d>=1] *= 2
         cost_matrix[row] = lambda_ * cost_matrix[row] + (1 - lambda_) * d
