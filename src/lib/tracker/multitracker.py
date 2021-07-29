@@ -526,7 +526,7 @@ class JDETracker(object):
         # Predict the current location with KF
         # for strack in strack_pool:
         # strack.predict()
-        
+        u_track, u_detection = range(len(strack_pool)), range(len(detections))
         dists = matching.embedding_distance(strack_pool, detections)
         # dists = matching.iou_distance(strack_pool, detections)
         if self.use_kf:
