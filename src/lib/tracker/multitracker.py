@@ -46,6 +46,7 @@ class STrack(BaseTrack):
         self.forecast_score = 0
         self.forecast_index = 0
         self.use_kf = use_kf
+        self.forecasts_kf = []
 
     def update_features(self, feat):
         feat /= np.linalg.norm(feat)
@@ -79,6 +80,24 @@ class STrack(BaseTrack):
             for i, (mean, cov) in enumerate(zip(multi_mean, multi_covariance)):
                 stracks[i].mean = mean
                 stracks[i].covariance = cov
+
+
+    @staticmethod
+    def multi_predict_n(stracks, n=60):
+        if len(stracks) > 0:
+            multi_mean_for = np.zeros((len(stracks), n,4))
+            multi_mean = np.asarray([st.mean.copy() for st in stracks])
+            multi_covariance = np.asarray([st.covariance for st in stracks])
+            for i, st in enumerate(stracks):
+                if st.state != TrackState.Tracked:
+                    multi_mean[i][7] = 0
+
+            for i in range(n):
+                multi_mean, multi_covariance = STrack.shared_kalman.multi_predict(
+                multi_mean, multi_covariance)
+                multi_mean_for[:, i, :] = multi_mean[:,:4]
+
+            return multi_mean_for
 
     def activate(self, kalman_filter, frame_id):
         """Start a new tracklet"""
@@ -530,6 +549,7 @@ class JDETracker(object):
         dists = matching.embedding_distance(strack_pool, detections)
         # dists = matching.iou_distance(strack_pool, detections)
         if self.use_kf:
+            STrack.multi_predict_n(strack_pool)
             STrack.multi_predict(strack_pool)
             dists = matching.fuse_motion(
                 self.kalman_filter, dists, strack_pool, detections)
