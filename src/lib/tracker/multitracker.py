@@ -219,7 +219,7 @@ class STrack(BaseTrack):
         return ret
 
     def __repr__(self):
-        return 'OT_{}_({}-{})'.format(self.track_id, self.start_frame, self.end_frame)
+        return 'OT_{}_({}-{})_({}_{})'.format(self.track_id, self.start_frame, self.end_frame, self.time_since_update, self.forecast_index)
 
 
 class JDETracker(object):
