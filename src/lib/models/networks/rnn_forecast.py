@@ -533,7 +533,8 @@ class RNNForecast(nn.Module):
             self.forecast = forecast
             if use_embedding:
                 heads['fct'] = hidden_size // 2
-            
+            else:
+                heads['fct'] = 1
         self.heads = heads
         for head in self.heads:
             classes = self.heads[head]
