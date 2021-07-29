@@ -96,8 +96,8 @@ class STrack(BaseTrack):
                 multi_mean, multi_covariance = STrack.shared_kalman.multi_predict(
                 multi_mean, multi_covariance)
                 multi_mean_for[:, i, :] = multi_mean[:,:4]
-
-            return multi_mean_for
+            for i in range(len(stracks)):
+                stracks[i].forecasts = multi_mean_for[i,...]
 
     def activate(self, kalman_filter, frame_id):
         """Start a new tracklet"""
