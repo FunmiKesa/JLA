@@ -544,7 +544,7 @@ class JDETracker(object):
         for itracked, idet in matches:
             track = strack_pool[itracked]
             det = detections[idet]
-            if self.forecast:
+            if not self.use_kf and self.forecast:
                 track.forecast_index = int(forecasts_inds[itracked, idet])
             track.time_since_update = 0
 
