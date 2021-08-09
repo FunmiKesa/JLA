@@ -96,7 +96,7 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
                 online_tlwhs.append(tlwh)
                 online_ids.append(tid)
                 online_scores.append(t.score)
-                if len(t.forecasts):
+                if t.time_since_update == 0 and len(t.forecasts):
                     online_forecasts.append(
                         np.array([tid] + list(t.forecasts_xywh.reshape(-1))))
         timer.toc()
@@ -109,7 +109,7 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
             gt_objs = evaluator.gt_frame_dict.get(frame_id+1, [])
             gt_tlwhs, gt_ids = unzip_objs(gt_objs)[:2]
             online_im = vis.plot_tracking(img0, online_tlwhs, online_ids, frame_id=frame_id,scores=online_scores,
-                                          fps=1. / timer.average_time, gt_tlwhs=gt_tlwhs, gt_ids=gt_ids)
+                                          fps=1. / timer.average_time, gt_tlwhs=gt_tlwhs, gt_ids=gt_ids, forecasts=online_forecasts)
         if show_image:
             os.environ['DISPLAY'] = 'user-MS-7883:11.0'
             cv2.namedWindow("online_im",cv2.WINDOW_NORMAL)
@@ -184,7 +184,7 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
             future_label_root = osp.join(opt.forecast_root, seq, 'img1')
 
             from forecast_utils import evaluation
-            aiou, fiou, ade, fde = evaluation.eval_seq(future_label_root, pred_folder= f"pred_{exp_name}")
+            aiou, fiou, ade, fde = evaluation.eval_seq(future_label_root, pred_length=60, pred_folder= f"pred_{exp_name}", fixed_length=True)
             aious.append(aiou)
             fious.append(fiou)
             ades.append(ade)
