@@ -84,20 +84,41 @@ class STrack(BaseTrack):
 
     @staticmethod
     def multi_predict_n(stracks, n=60):
+        # stracks = [t for t in stracks if len(t.pasts) == t.past_length]
+
         if len(stracks) > 0:
-            multi_mean_for = np.zeros((len(stracks), n,4))
+            multi_mean_for = np.zeros((len(stracks), n+1,4))
             multi_mean = np.asarray([st.mean.copy() for st in stracks])
             multi_covariance = np.asarray([st.covariance for st in stracks])
             for i, st in enumerate(stracks):
                 if st.state != TrackState.Tracked:
                     multi_mean[i][7] = 0
+            
+            multi_mean_for[:, 0, :] = STrack.xyah_to_tlbr(multi_mean[:,:4])
 
-            for i in range(n):
-                multi_mean, multi_covariance = STrack.shared_kalman.multi_predict(
+            for i in range(1, n+1):
+                multi_mean, _ = STrack.shared_kalman.multi_predict(
                 multi_mean, multi_covariance)
-                multi_mean_for[:, i, :] = multi_mean[:,:4]
+                multi_mean_for[:, i, :] = STrack.xyah_to_tlbr(multi_mean[:,:4])# convert from xyah to tlbr
             for i in range(len(stracks)):
                 stracks[i].forecasts = multi_mean_for[i,...]
+
+    # @staticmethod
+    # def multi_predict_n(stracks, n=60):
+    #     if len(stracks) > 0:
+    #         multi_mean_for = np.zeros((len(stracks), n,4))
+    #         multi_mean = np.asarray([st.mean.copy() for st in stracks])
+    #         multi_covariance = np.asarray([st.covariance for st in stracks])
+    #         for i, st in enumerate(stracks):
+    #             if st.state != TrackState.Tracked:
+    #                 multi_mean[i][7] = 0
+
+    #         for i in range(n):
+    #             multi_mean, multi_covariance = STrack.shared_kalman.multi_predict(
+    #             multi_mean, multi_covariance)
+    #             multi_mean_for[:, i, :] = multi_mean[:,:4]
+    #         for i in range(len(stracks)):
+    #             stracks[i].forecasts = multi_mean_for[i,...]
 
     def activate(self, kalman_filter, frame_id):
         """Start a new tracklet"""
@@ -235,6 +256,15 @@ class STrack(BaseTrack):
     def tlwh_to_tlbr(tlwh):
         ret = np.asarray(tlwh).copy()
         ret[2:] += ret[:2]
+        return ret
+
+    @staticmethod
+    # @jit(nopython=True)
+    def xyah_to_tlbr(xyah):
+        ret = np.asarray(xyah).copy()
+        ret[..., 2] *= ret[..., 3]
+        ret[..., :2] -= ret[..., 2:] / 2
+        ret[..., 2:] += ret[..., :2]
         return ret
 
     def __repr__(self):
@@ -551,8 +581,11 @@ class JDETracker(object):
         if self.use_kf:
             STrack.multi_predict_n(strack_pool)
             STrack.multi_predict(strack_pool)
-            dists = matching.fuse_motion(
-                self.kalman_filter, dists, strack_pool, detections)
+            # dists = matching.fuse_motion(
+                # self.kalman_filter, dists, strack_pool, detections)
+            r_tracked_stracks = list(strack_pool)
+            dists, forecasts_inds = matching.fuse_motion2(dists, r_tracked_stracks, detections)
+
         elif self.forecast:
             #fuse short term motion
             r_tracked_stracks = list(strack_pool)
@@ -564,7 +597,7 @@ class JDETracker(object):
         for itracked, idet in matches:
             track = strack_pool[itracked]
             det = detections[idet]
-            if not self.use_kf and self.forecast:
+            if self.forecast:
                 track.forecast_index = int(forecasts_inds[itracked, idet])
             track.time_since_update = 0
 
