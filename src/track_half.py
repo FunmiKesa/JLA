@@ -96,7 +96,7 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
                 online_tlwhs.append(tlwh)
                 online_ids.append(tid)
                 online_scores.append(t.score)
-                if t.time_since_update == 0 and len(t.forecasts):
+                if t.tracklet_len > 0 and len(t.forecasts):
                     online_forecasts.append(
                         np.array([tid] + list(t.forecasts_xywh.reshape(-1))))
         timer.toc()
