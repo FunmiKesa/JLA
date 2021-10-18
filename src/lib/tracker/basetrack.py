@@ -6,7 +6,8 @@ class TrackState(object):
     New = 0
     Tracked = 1
     Lost = 2
-    Removed = 3
+    Removed = 3,
+    Occluded=4
 
 
 class BaseTrack(object):
@@ -50,3 +51,6 @@ class BaseTrack(object):
 
     def mark_removed(self):
         self.state = TrackState.Removed
+        
+    def mark_occluded(self):
+        self.state = TrackState.Occluded
