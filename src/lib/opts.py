@@ -5,7 +5,7 @@ from __future__ import print_function
 import argparse
 import os
 import sys
-
+import git
 
 class opts(object):
     def __init__(self):
@@ -13,6 +13,7 @@ class opts(object):
         # basic experiment setting
         self.parser.add_argument('task', default='mot', help='mot')
         self.parser.add_argument('--dataset', default='jde', help='jde')
+        self.parser.add_argument('--desc', default='', help='desc')
         self.parser.add_argument('--exp_id', default='default')
         self.parser.add_argument('--test', action='store_true')
         # self.parser.add_argument('--load_model', default='../models/ctdet_coco_dla_2x.pth',
@@ -219,6 +220,9 @@ class opts(object):
         else:
             opt = self.parser.parse_args(args)
 
+        repo = git.Repo(search_parent_directories=True)
+        sha = repo.head.object.hexsha
+        opt.git_commit = sha
         opt.gpus_str = opt.gpus
         opt.gpus = [int(gpu) for gpu in opt.gpus.split(',')]
         opt.gpus = [i for i in range(
