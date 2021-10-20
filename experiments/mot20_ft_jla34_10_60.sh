@@ -2,7 +2,7 @@ cd src
 CUDA_VISIBLE_DEVICES='0,1' python train.py mot \
 --exp_id 'mot20_ajla34_10_60' \
 --arch 'rnnforecast_34' \
---load_model '../jla_models/jla.pth' \
+--load_model '../models/jla.pth' \
 --data_cfg '../src/lib/cfg/mot20.json' \
 --batch_size '16' \
 --num_epochs '20' \
