@@ -522,12 +522,15 @@ class JDETracker(object):
         dists = matching.embedding_distance(strack_pool, detections)
         # dists = matching.iou_distance(strack_pool, detections)
         if self.use_kf:
-            STrack.multi_predict_n(strack_pool)
-            STrack.multi_predict(strack_pool)
-            # dists = matching.fuse_motion(
-                # self.kalman_filter, dists, strack_pool, detections)
-            r_tracked_stracks = list(strack_pool)
-            dists, forecasts_inds = matching.fuse_motion2(dists, r_tracked_stracks, detections)
+            if self.forecast:
+                STrack.multi_predict_n(strack_pool)
+                STrack.multi_predict(strack_pool)
+                r_tracked_stracks = list(strack_pool)
+                dists, forecasts_inds = matching.fuse_motion2(dists, r_tracked_stracks, detections)
+            else:
+                STrack.multi_predict(strack_pool)
+                dists = matching.fuse_motion(
+                    self.kalman_filter, dists, strack_pool, detections)
 
         elif self.forecast:
             #fuse short term motion
