@@ -1,25 +1,32 @@
 import numpy as np
 
 
-def calc_fde(outputs, targets):
+def calc_fde(outputs, targets, return_mean=True):
     '''
     Calculates the final displacement between outputs and
     targets centroids
     Args:
-        outputs: np array. 3D array format (trajectory) x (timestep) x (x1y1x2y2)
-        targets: np array. 3D array format (trajectory) x (timestep) x (x1y1x2y2)
+        outputs: np array. 3D array format (trajectory) x (timestep) x (cxcywh)
+        targets: np array. 3D array format (trajectory) x (timestep) x (cxcywh)
     Returns:
         float: Final displacement error between outputs and targets
     '''
-    out_mid_xs = outputs[:, -1, 0]
-    out_mid_ys = outputs[:, -1, 1]
+    # out_mid_xs = outputs[:, -1, 0]
+    # out_mid_ys = outputs[:, -1, 1]
 
-    tar_mid_xs = targets[:, -1, 0]
-    tar_mid_ys = targets[:, -1, 1]
-    diff = ((out_mid_xs - tar_mid_xs) * (out_mid_xs - tar_mid_xs)) + \
-        ((out_mid_ys - tar_mid_ys) * (out_mid_ys - tar_mid_ys))
+    # tar_mid_xs = targets[:, -1, 0]
+    # tar_mid_ys = targets[:, -1, 1]
+    # diff = ((out_mid_xs - tar_mid_xs) * (out_mid_xs - tar_mid_xs)) + \
+    #     ((out_mid_ys - tar_mid_ys) * (out_mid_ys - tar_mid_ys))
 
-    return float(np.mean(np.sqrt(diff)))
+    outputs = outputs[:, -1, :2]
+    targets = targets[:, -1, :2]
+
+    diff = (outputs - targets) * (outputs - targets)
+    if return_mean:
+        return float(np.mean(np.sqrt(np.mean(diff, axis=1))))
+    else:
+        return np.sqrt(np.mean(diff, axis=1))
 
 
 def calc_ade(outputs, targets, return_mean=True):
@@ -27,8 +34,8 @@ def calc_ade(outputs, targets, return_mean=True):
     Calculates the average displacement between outputs and
     targets centroids
     Args:
-        outputs: np array. 3D array format (trajectory) x (timestep) x (x1y1x2y2)
-        targets: np array. 3D array format (trajectory) x (timestep) x (x1y1x2y2)
+        outputs: np array. 3D array format (trajectory) x (timestep) x (cxcywh)
+        targets: np array. 3D array format (trajectory) x (timestep) x (cxcywh)
     Returns:
         float: Average IOU between outputs and targets
     '''
@@ -47,20 +54,20 @@ def calc_ade(outputs, targets, return_mean=True):
         return np.sqrt(np.mean(diff, axis=1))
 
 
-def calc_fiou(outputs, targets):
+def calc_fiou(outputs, targets, return_mean=True):
     '''
     Calculates the final IOU between outputs and
     targets
     Args:
-        outputs: np array. 3D array format (trajectory) x (timestep) x (x1y1x2y2)
-        targets: np array. 3D array format (trajectory) x (timestep) x (x1y1x2y2)
+        outputs: np array. 3D array format (trajectory) x (timestep) x (cxcywh)
+        targets: np array. 3D array format (trajectory) x (timestep) x (cxcywh)
     Returns:
         float: Average final IOU between outputs and targets
     '''
     final_outputs = outputs[:, -1, :]
     final_targets = targets[:, -1, :]
     fiou = get_iou(final_outputs, final_targets)
-    return float(np.mean(fiou))
+    return float(np.mean(fiou)) if return_mean else fiou
 
 
 def calc_aiou(outputs, targets, return_mean=True):
@@ -68,8 +75,8 @@ def calc_aiou(outputs, targets, return_mean=True):
     Calculates the average IOU between outputs and
     targets
     Args:
-        outputs: np array. 3D array format (trajectory) x (timestep) x (x1y1x2y2)
-        targets: np array. 3D array format (trajectory) x (timestep) x (x1y1x2y2)
+        outputs: np array. 3D array format (trajectory) x (timestep) x (cxcywh)
+        targets: np array. 3D array format (trajectory) x (timestep) x (cxcywh)
     Returns:
         float: Average IOU between outputs and targets
     '''
@@ -83,7 +90,7 @@ def calc_aiou(outputs, targets, return_mean=True):
     if return_mean:
         return float(np.mean(np.mean(ious, axis=1)))
     else:
-        float(np.mean(ious, axis=1))
+        return np.mean(ious, axis=1)
 
 
 def get_iou(bboxes1, bboxes2):
