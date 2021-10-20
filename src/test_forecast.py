@@ -93,20 +93,10 @@ class JDETracker(object):
                     bboxes = np.stack(bboxes, axis=0)
                     bbox = bboxes.copy()
                     labels = bbox.copy()
-                    # print(bbox[0][0])
-
-                    # labels[..., 0] = ratio * bbox[..., 0] + dw
-                    # labels[..., 1] = ratio * bbox[..., 1] + dh
-                    # labels[..., 2] = ratio * bbox[..., 2] + dw
-                    # labels[..., 3] = ratio * bbox[..., 3] + dh
-
-                    # labels = xyxy2xywh(labels.copy())
-                    # labels[..., [0, 2]] /= inp_width
-                    # labels[..., [1, 3]] /= inp_height
-
+                    
                     labels[..., [0, 2]] *= output_w
                     labels[..., [1, 3]] *= output_h
-                    # print("\nlabels", labels[0,0,:])
+
                     # flip - oldest first
                     labels = np.flip(labels, 1)
                     pasts_mask = np.flip(pasts_mask, 1)
@@ -144,29 +134,7 @@ class JDETracker(object):
                 pred_futures[..., [1, 3]] -= dh
                 pred_futures[..., [0, 2]] -= dw
                 pred_futures /= ratio
-
-                # labels = pred_futures.copy()
-                # pred_futures[..., [0, 2]] /= output_w
-                # pred_futures[..., [1, 3]] /= output_h
-
-                # print("\npred_futures",pred_futures[0,0,:] , width, ratio)
-
-                # pred_futures[..., [0, 2]] *= inp_width
-                # pred_futures[..., [1, 3]] *= inp_height
-                # pred_futures = xywh2xyxy(pred_futures.copy())
-                # pred_futures[..., [0, 2]] -= dw
-                # pred_futures[..., [1, 3]] -= dh
-                # pred_futures[..., [0, 2]] /= inp_width
-                # pred_futures[..., [1, 3]] /= inp_height
-                # pred_futures /= ratio
-                # pred_futures[..., [0, 2]] *= width
-                # pred_futures[..., [1, 3]] *= height
-
-                # print(pred_futures[0,0])
-
-                # pred_futures = xyxy2xywh(pred_futures.copy())
-
-
+               
                 # pred_futures[..., [0,2]] = np.clip(pred_futures[..., [0,2]], 0, width)
                 # pred_futures[..., [1,3]] = np.clip(pred_futures[..., [1,3]], 0, height)
         return track_ids, pred_futures

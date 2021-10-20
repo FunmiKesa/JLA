@@ -198,7 +198,7 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
             future_label_root = osp.join(opt.forecast_root, seq, 'img1')
 
             from forecast_utils import evaluation
-            aiou, fiou, ade, fde = evaluation.eval_seq(future_label_root, pred_folder= f"pred_{exp_name}")
+            aiou, fiou, ade, fde = evaluation.eval_seq(future_label_root, pred_length=opt.future_length, pred_folder= f"pred_{exp_name}", fixed_length=opt.fixed_length)
             aious.append(aiou)
             fious.append(fiou)
             ades.append(ade)

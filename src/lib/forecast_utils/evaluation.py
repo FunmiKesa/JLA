@@ -16,8 +16,7 @@ import glob
 import motmetrics as mm
 mm.lap.default_solver = 'lap'
 
-
-def eval_seq(gt_label_root, pred_length=30, gt_folder='future', pred_folder='pred', fixed_length=False):
+def get_bboxes(gt_label_root, pred_length=30, gt_folder='future', pred_folder='pred', fixed_length=False):
     bboxes1 = []
     bboxes2 = []
     pred_label_root = gt_label_root.replace(gt_folder, pred_folder)
@@ -34,7 +33,7 @@ def eval_seq(gt_label_root, pred_length=30, gt_folder='future', pred_folder='pre
 
     intersect = [filename for filename in smaller if filename.replace(
         smaller_folder, larger_folder) in larger]
-
+    info = []
     for filename1 in intersect:
 
         filename2 = filename1.replace(smaller_folder, larger_folder)
@@ -47,7 +46,9 @@ def eval_seq(gt_label_root, pred_length=30, gt_folder='future', pred_folder='pre
         mask2 = mask2[:, 1:].reshape(mask2.shape[0], -1, 4)
         bbox2 = bbox2[:, 1:].reshape(bbox2.shape[0], pred_length, -1)
 
-        b1, b2 = bbox1[:, 0, :], bbox2[:, 0, :]
+        b1, b2 = bbox1[:, 0, :].copy(), bbox2[:, 0, :].copy()
+        b1[:, :2] -= b1[:, 2:] / 2
+        b2[:, :2] -= b2[:, 2:] / 2
 
         # get distance matrix
         dists = mm.distances.iou_matrix(b1, b2, max_iou=0.5)
@@ -87,6 +88,8 @@ def eval_seq(gt_label_root, pred_length=30, gt_folder='future', pred_folder='pre
 
         bboxes1 += [bbox1]
         bboxes2 += [bbox2]
+        if len(bbox1):
+            info.extend([filename1.replace(smaller_folder, "images")] * len(bbox1))
 
     if len(bboxes1) > 0:
         bboxes1 = np.concatenate(bboxes1)
@@ -98,13 +101,24 @@ def eval_seq(gt_label_root, pred_length=30, gt_folder='future', pred_folder='pre
     else:
         bboxes2 = np.array([])
 
-    aiou, fiou, ade, fde = 0, 0, 0, 0
+    print(smaller_folder, larger_folder)
+    return {smaller_folder: bboxes1, larger_folder: bboxes2, "filenames":info}
 
+ 
+def eval_seq(gt_label_root, pred_length=30, gt_folder='future', pred_folder='pred', fixed_length=True, return_mean=True):
+    
+    bboxes = get_bboxes(gt_label_root, pred_length, gt_folder, pred_folder, fixed_length)
+    bboxes1, bboxes2 = bboxes[gt_folder], bboxes[pred_folder]
+
+    aiou, fiou, ade, fde = 0, 0, 0, 0
     if (len(bboxes1) > 0) & (len(bboxes2) > 0):
-        ade = calc_ade(bboxes1, bboxes2)
-        fde = calc_fde(bboxes1, bboxes2)
-        aiou = calc_aiou(bboxes1, bboxes2) * 100
-        fiou = calc_fiou(bboxes1, bboxes2) * 100
+        ade = calc_ade(bboxes1, bboxes2, return_mean)
+        fde = calc_fde(bboxes1, bboxes2, return_mean)
+        aiou = calc_aiou(bboxes1, bboxes2, return_mean) 
+        fiou = calc_fiou(bboxes1, bboxes2, return_mean) 
+        if not return_mean:
+            aiou *= 100
+            fiou *= 100
 
     return aiou, fiou, ade, fde
 
