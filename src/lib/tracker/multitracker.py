@@ -455,8 +455,8 @@ class JDETracker(object):
 
                 pred_futures[..., [0, 2]] /= output_w
                 pred_futures[..., [1, 3]] /= output_h
-                pred_futures[..., [1, 3]] *= inp_height
                 pred_futures[..., [0, 2]] *= inp_width
+                pred_futures[..., [1, 3]] *= inp_height
                 pred_futures = xywh2xyxy(pred_futures.copy())
                 pred_futures[..., [0, 2]] -= dw
                 pred_futures[..., [1, 3]] -= dh
