@@ -82,6 +82,119 @@ class LoadImages:  # for inference
         return self.nF  # number of files
 
 
+class LoadImagesAndPasts:  # for inference
+    def __init__(self, path, img_size=(1088, 608), past_length=0):
+        if os.path.isdir(path):
+            image_format = ['.jpg', '.jpeg', '.png', '.tif']
+            self.files = sorted(glob.glob('%s/*.*' % path))
+            self.files = list(filter(lambda x: os.path.splitext(x)[
+                              1].lower() in image_format, self.files))
+        elif os.path.isfile(path):
+            self.files = [path]
+
+        self.past_length = past_length
+        if self.past_length > 0:
+            self.forecast_past_files = [
+                x.replace('images', 'past').replace('jpg', 'txt').replace('png', 'txt') for x in self.files]
+
+        self.nF = len(self.files)  # number of image files
+        self.width = img_size[0]
+        self.height = img_size[1]
+        self.count = 0
+
+        assert self.nF > 0, 'No images found in ' + path
+
+    def six_dim(self, data, mask):
+        inds = data[:, 0]
+        data = data[:, 1:]
+        n = data.shape[-1] // 4
+        data = data.reshape(data.shape[0], n, 4)
+        mask = mask[:, 1:].reshape(mask.shape[0], n, 4)
+
+        temp = np.zeros((data.shape[0], n, 6))
+        temp[:, :, 2:] = data
+        temp[:, :, 1] = inds[:, np.newaxis]
+        temp = temp.reshape(-1, 6)
+        data = temp
+        mask = mask.reshape(-1, 4)
+        return data, mask
+
+    def __iter__(self):
+        self.count = -1
+        return self
+
+    def __next__(self):
+        self.count += 1
+        if self.count == self.nF:
+            raise StopIteration
+        return self.get_data(self.count)
+
+    def get_data(self, idx):
+        height = self.height
+        width = self.width
+        img_path = self.files[idx]
+
+        # Read image
+        img0 = cv2.imread(img_path)  # BGR
+        assert img0 is not None, 'Failed to load ' + img_path
+
+        h, w, _ = img0.shape
+
+        # Padded resize
+        img, ratio, dw, dh = letterbox(img0, height=self.height, width=self.width)
+
+        # Normalize RGB
+        img = img[:, :, ::-1].transpose(2, 0, 1)
+        img = np.ascontiguousarray(img, dtype=np.float32)
+        img /= 255.0
+
+        # cv2.imwrite(img_path + '.letterbox.jpg', 255 * img.transpose((1, 2, 0))[:, :, ::-1])  # save letterbox image
+
+        # load pasts data
+        pasts_data, p_mask = np.array([]), np.array([])
+        if self.past_length > 0:
+            forecast_past_path = self.forecast_past_files[self.count]
+            if os.path.exists(forecast_past_path):
+                column_length = (self.past_length + 1) * 4 + 1
+                pasts_data, p_mask = load_txt(
+                    forecast_past_path, column_length, max_column=121)
+                pasts_data, p_mask = self.six_dim(pasts_data, p_mask)
+                
+                labels = pasts_data.copy()
+
+                labels[:, [2, 4]] /= w
+                labels[:, [3, 5]] /= h
+
+                # Normalized xywh to pixel xyxy format
+                pasts_data[:, 2] = ratio * w * \
+                    (labels[:, 2] - labels[:, 4] / 2) + dw
+                pasts_data[:, 3] = ratio * h * \
+                    (labels[:, 3] - labels[:, 5] / 2) + dh
+                pasts_data[:, 4] = ratio * w * \
+                    (labels[:, 2] + labels[:, 4] / 2) + dw
+                pasts_data[:, 5] = ratio * h * \
+                    (labels[:, 3] + labels[:, 5] / 2) + dh
+
+                # convert xyxy to xywh
+                pasts_data[:, 2:] = xyxy2xywh(
+                    pasts_data[:, 2:].copy())  # / height
+                pasts_data[:, 2] /= width
+                pasts_data[:, 3] /= height
+                pasts_data[:, 4] /= width
+                pasts_data[:, 5] /= height
+
+                pasts_data = pasts_data.reshape(-1, self.past_length + 1, 6)
+                p_mask = p_mask.reshape(-1, self.past_length + 1, 4)[:, 1:, :]
+        return img_path, img, img0, pasts_data, p_mask
+
+    def __getitem__(self, idx):
+        idx = idx % self.nF
+        return self.get_data(idx)
+
+    def __len__(self):
+        return self.nF  # number of files
+
+
 class LoadVideo:  # for inference
     def __init__(self, path, img_size=(1088, 608)):
         self.cap = cv2.VideoCapture(path)
@@ -471,8 +584,7 @@ class JointDataset(LoadImagesAndLabels):  # for training
         mask = mask.reshape(-1, 4)
         return data, mask
 
-    def __getitem__(self, files_index):
-
+    def get_file_path(self, files_index):
         for i, c in enumerate(self.cds):
             if files_index >= c:
                 ds = list(self.label_files.keys())[i]
@@ -480,6 +592,11 @@ class JointDataset(LoadImagesAndLabels):  # for training
 
         img_path = self.img_files[ds][files_index - start_index]
         label_path = self.label_files[ds][files_index - start_index]
+        return img_path, label_path, ds, start_index
+
+    def __getitem__(self, files_index):
+
+        img_path, label_path, ds, start_index = self.get_file_path(files_index)
         futures_data, pasts_data = [], []
         if self.forecast:
             # initialization

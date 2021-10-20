@@ -30,6 +30,7 @@ def gen_future_files(seq_label_root, future_label_root, future_length=60, img_si
                 "Something is not right! Frame id should be unique. Please check the source code and data.")
 
         bbox = np.loadtxt(filepath, dtype=np.float64)
+        size = img_size
         if len(bbox) == 0:
             continue
         if not img_size:
@@ -99,14 +100,16 @@ def main(d, future_label, future_length):
                 img_size = None
                 seq_info_file = osp.join(seq_root, seq, 'seqinfo.ini')
                 if osp.exists(seq_info_file):
-                    seq_info = open(
-                        osp.join(seq_root, seq, 'seqinfo.ini')).read()
-                    seq_width = int(seq_info[seq_info.find(
-                        'imWidth=') + 8:seq_info.find('\nimHeight')])
-                    seq_height = int(seq_info[seq_info.find(
-                        'imHeight=') + 9:seq_info.find('\nimExt')])
+                    with open(
+                            osp.join(seq_root, seq, 'seqinfo.ini'), 'r') as file:
+                        seq_info = file.read()
+                        seq_width = int(seq_info[seq_info.find(
+                            'imWidth=') + 8:seq_info.find('\nimHeight')])
+                        seq_height = int(seq_info[seq_info.find(
+                            'imHeight=') + 9:seq_info.find('\nimExt')])
 
                     img_size = (seq_height, seq_width)
+                    print(seq, img_size)
 
                 seq_label_root = osp.join(label_root, seq, seq_label)
                 future_label_root = seq_label_root.replace(
@@ -192,7 +195,7 @@ def print_progress(iteration, total, prefix='', suffix='', decimals=3, bar_lengt
 
 if __name__ == "__main__":
     datasets = ["CityWalks", "PRW", "Caltech","CityWalks",  "MOT15", "MOT16", "MOT17", "MOT20"]
-    datasets = ["CityWalks"]
+    datasets = ["MOT17"]
     future_label = 'future'
     future_length = 60
 

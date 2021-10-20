@@ -103,12 +103,10 @@ if __name__ == "__main__":
                     img_size = None
                     # seq_info_file = osp.join(seq_root, seq, 'seqinfo.ini')
                     # if osp.exists(seq_info_file):
-                    #     seq_info = open(
-                    #         osp.join(seq_root, seq, 'seqinfo.ini')).read()
-                    #     seq_width = int(seq_info[seq_info.find(
-                    #         'imWidth=') + 8:seq_info.find('\nimHeight')])
-                    #     seq_height = int(seq_info[seq_info.find(
-                    #         'imHeight=') + 9:seq_info.find('\nimExt')])
+                    #     with open(osp.join(seq_root, seq, 'seqinfo.ini'), 'r') as file:
+                        # seq_info = file.read()
+                        # seq_width = int(seq_info[seq_info.find('imWidth=') + 8:seq_info.find('\nimHeight')])
+                        # seq_height = int(seq_info[seq_info.find('imHeight=') + 9:seq_info.find('\nimExt')])
 
                     #     img_size = (seq_height, seq_width)
 

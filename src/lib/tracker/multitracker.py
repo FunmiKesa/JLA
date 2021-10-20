@@ -373,8 +373,8 @@ class JDETracker(object):
             dh = (inp_height - new_shape[1]) / 2  # height padding
             rw = ratio * width / inp_width
             rh = ratio * height / inp_height
-            output_h = new_shape[1] // self.opt.down_ratio
-            output_w = new_shape[0] // self.opt.down_ratio
+            output_h = inp_height // self.opt.down_ratio
+            output_w = inp_width // self.opt.down_ratio
 
             objs_count = 0
             bboxes = []
