@@ -373,8 +373,8 @@ class JDETracker(object):
             dh = (inp_height - new_shape[1]) / 2  # height padding
             rw = ratio * width / inp_width
             rh = ratio * height / inp_height
-            output_h = inp_height // self.opt.down_ratio
-            output_w = inp_width // self.opt.down_ratio
+            output_h = new_shape[1] // self.opt.down_ratio
+            output_w = new_shape[0] // self.opt.down_ratio
 
             objs_count = 0
             bboxes = []
@@ -458,8 +458,8 @@ class JDETracker(object):
                 pred_futures[..., [1, 3]] *= inp_height
                 pred_futures[..., [0, 2]] *= inp_width
                 pred_futures = xywh2xyxy(pred_futures.copy())
-                pred_futures[..., [1, 3]] -= dh
                 pred_futures[..., [0, 2]] -= dw
+                pred_futures[..., [1, 3]] -= dh
                 pred_futures /= ratio
                 # pred_futures[..., [0,2]] = np.clip(pred_futures[..., [0,2]], 0, width)
                 # pred_futures[..., [1,3]] = np.clip(pred_futures[..., [1,3]], 0, height)
