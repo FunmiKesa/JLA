@@ -43,6 +43,7 @@ def load_classes(path):
     """
     fp = open(path, 'r')
     names = fp.read().split('\n')
+    fp.close()
     return list(filter(None, names))  # filter removes empty strings (such as last line)
 
 

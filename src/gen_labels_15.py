@@ -18,9 +18,10 @@ seqs = ['ADL-Rundle-6', 'ETH-Bahnhof', 'KITTI-13', 'PETS09-S2L1', 'TUD-Stadtmitt
 tid_curr = 0
 tid_last = -1
 for seq in seqs:
-    seq_info = open(osp.join(seq_root, seq, 'seqinfo.ini')).read()
-    seq_width = int(seq_info[seq_info.find('imWidth=') + 8:seq_info.find('\nimHeight')])
-    seq_height = int(seq_info[seq_info.find('imHeight=') + 9:seq_info.find('\nimExt')])
+    with open(osp.join(seq_root, seq, 'seqinfo.ini'), 'r') as file:
+        seq_info = file.read()
+        seq_width = int(seq_info[seq_info.find('imWidth=') + 8:seq_info.find('\nimHeight')])
+        seq_height = int(seq_info[seq_info.find('imHeight=') + 9:seq_info.find('\nimExt')])
 
     gt_txt = osp.join(seq_root, seq, 'gt', 'gt.txt')
     gt = np.loadtxt(gt_txt, dtype=np.float64, delimiter=',')
