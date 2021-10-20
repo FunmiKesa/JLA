@@ -9,5 +9,5 @@
 #SBATCH --cpus-per-task=8 
 
 singularity exec \
-        --nv -w \
-        ../../transfer sh -c "cd .. &&  sh experiments/mot17_half_jla_10_60.sh"
+        --nv -B /mnt/beegfs/home/pearl022/funmi/FairMOT:/FairMOT\
+                ../exp/conda sh -c ". /usr/local/etc/profile.d/conda.sh && conda activate FairMOT && cd /FairMOT && sh experiments/mot17_half_jla_10_60.sh"

@@ -34,10 +34,10 @@ class DecoderRNN(nn.Module):
         self.fc_out = nn.Linear(self.num_hidden, self.output_size)
         self.relu_context = nn.ReLU()
         self.relu_output = nn.ReLU()
-        self.relu_dla_features = nn.ReLU()
+        # self.relu_dla_features = nn.ReLU()
         self.context_encoder = nn.Linear(
             self.num_hidden, int(self.num_hidden / 2))
-        self.dla_encoder = nn.Linear(self.num_hidden // 2, int(self.num_hidden / 2))
+        # self.dla_encoder = nn.Linear(self.num_hidden // 2, int(self.num_hidden / 2))
 
     def forward(self, context, dla_features=None, future_length=5,  past_length=10):
         outputs = []
@@ -60,9 +60,9 @@ class DecoderRNN(nn.Module):
         result.append(decoded_inputs)
 
         if self.use_embedding:
-            encoded_dla_features = self.dla_encoder(dla_features)
-            encoded_dla_features = self.relu_dla_features(encoded_dla_features)
-            encoded_context = torch.cat((encoded_context, encoded_dla_features), 1)
+            # encoded_dla_features = self.dla_encoder(dla_features)
+            # encoded_dla_features = self.relu_dla_features(encoded_dla_features)
+            encoded_context = torch.cat((encoded_context, dla_features), 1)
 
         h_t = context
 

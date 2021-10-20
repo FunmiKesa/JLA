@@ -1,6 +1,7 @@
 cd src
 CUDA_VISIBLE_DEVICES='0,1' python train.py mot \
---exp_id 'mot17_half_jla_10_60_2' \
+--exp_id 'testReverse' \
+--desc 'Goal: test reverse input, and dla_features without encoding in forecast_rnn' \
 --arch 'rnnforecast_34' \
 --load_model '../models/ctdet_coco_dla_2x.pth' \
 --data_cfg '../src/lib/cfg/mot17_half.json' \
@@ -12,12 +13,12 @@ CUDA_VISIBLE_DEVICES='0,1' python train.py mot \
 --future_length '60' \
 --forecast \
 --use_embedding \
---multiprocessing_distributed \
---dist-url tcp://127.0.0.1:5564 \
---dist-backend 'nccl' \
---world-size '1' \
---rank '0' \
+# --multiprocessing_distributed \
+# --dist-url tcp://127.0.0.1:5564 \
+# --dist-backend 'nccl' \
+# --world-size '1' \
+# --rank '0' \
 
 
-python track_half.py mot --load_model ../exp/mot/mot17_half_jla_10_60_2/model_last.pth --conf_thres 0.4 --val_mot17 --exp_id mot17_half_jla_10_60_2 --arch rnnforecast_34 --forecast --use_embedding --no_kf --past_length 10 --future_length 60
+python track_half.py mot --load_model ../exp/mot/testReverse/model_last.pth --conf_thres 0.4 --val_mot17 --exp_id testReverse --arch rnnforecast_34 --forecast --use_embedding --no_kf --past_length 10 --future_length 60
 
