@@ -62,7 +62,7 @@ class DecoderRNN(nn.Module):
         if self.use_embedding:
             encoded_dla_features = self.dla_encoder(dla_features)
             encoded_dla_features = self.relu_dla_features(encoded_dla_features)
-            encoded_context = torch.cat((encoded_context, encoded_dla_features), 1)
+            encoded_context = torch.cat((encoded_context, dla_features), 1)
 
         h_t = context
 
