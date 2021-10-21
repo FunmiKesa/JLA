@@ -54,8 +54,8 @@ class DecoderRNN(nn.Module):
         for i in range(past_length-1, -1, -1):
             h_t = self.decoder1(encoded_context, h_t)
             input = self.fc_in(h_t)
-            decoded_inputs.insert(0, input)
-            # decoded_inputs += [input]
+            # decoded_inputs.insert(0, input)
+            decoded_inputs += [input]
         decoded_inputs = torch.stack(decoded_inputs, 1)
         result.append(decoded_inputs)
 
