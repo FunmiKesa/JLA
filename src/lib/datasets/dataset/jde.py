@@ -614,21 +614,20 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 (self.max_objs, self.past_length, self.input_size), dtype=np.uint8)
             pasts_inds = np.zeros((self.max_objs), dtype=np.int64)
 
-            if os.path.exists(forecast_future_path):
-                column_length = (self.future_length) * 4 + 1
-                futures_data, f_mask = load_txt(
-                    forecast_future_path, column_length, max_column=361)
-
-                futures_data, f_mask = self.six_dim(futures_data, f_mask)
-
-            if os.path.exists(forecast_past_path):
+            if os.path.exists(forecast_past_path) and os.path.exists(forecast_future_path):
                 column_length = (self.past_length + 1) * 4 + 1
                 pasts_data, p_mask = load_txt(
-                    forecast_past_path, column_length, max_column=121)
+                    forecast_past_path, column_length, max_column=121, fixed_length=self.fixed_length)
                 pasts_data, p_mask = self.six_dim(pasts_data, p_mask)
 
-            if self.fixed_length:
-                print(p_mask.shape)
+                # if self.fixed_length:
+                #     print(forecast_past_path, p_mask.shape,p_mask.sum())
+
+                column_length = (self.future_length) * 4 + 1
+                futures_data, f_mask = load_txt(
+                    forecast_future_path, column_length, max_column=361,fixed_length=self.fixed_length)
+
+                futures_data, f_mask = self.six_dim(futures_data, f_mask)
 
         imgs, labels, img_path, (input_h, input_w), (f_data, f_data_mask), (p_data, p_data_mask) = self.get_data(
             img_path, label_path, futures_data, pasts_data)
@@ -788,8 +787,8 @@ class JointDataset(LoadImagesAndLabels):  # for training
         labels = np.array([])
         labels_f = np.array(futures_data)
         labels_p = np.array(pasts_data)
-        labels_f_mask = np.array([])
-        labels_p_mask = np.array([])
+        labels_f_mask = np.ones(futures_data.shape[0]).astype(bool)
+        labels_p_mask = np.ones(pasts_data.shape[0]).astype(bool)
 
         # Load labels
         if os.path.isfile(label_path):
@@ -841,28 +840,32 @@ class JointDataset(LoadImagesAndLabels):  # for training
         if self.augment:
             img, labels, M, a = random_affine(
                 img, labels, degrees=(-5, 5), translate=(0.10, 0.10), scale=(0.50, 1.20))
+            
+            # if len(futures_data):
+                # labels_f, labels_f_mask = warp_points(labels_f, M, a)
+            
+            # if len(pasts_data):
+                # labels_p, labels_p_mask = warp_points(labels_p, M, a)
 
-            if len(futures_data):
-                labels_f, labels_f_mask = warp_points(labels_f, M, a)
-                # convert xyxy to xywh
-                labels_f[:, 2:6] = xyxy2xywh(
-                    labels_f[:, 2:6].copy())  # / height
-                labels_f[:, 2] /= width
-                labels_f[:, 3] /= height
-                labels_f[:, 4] /= width
-                labels_f[:, 5] /= height
+        if len(futures_data) > 0:
+            # convert xyxy to xywh
+            labels_f[:, 2:6] = xyxy2xywh(
+                labels_f[:, 2:6].copy())  # / height
+            labels_f[:, 2] /= width
+            labels_f[:, 3] /= height
+            labels_f[:, 4] /= width
+            labels_f[:, 5] /= height
 
-            if len(pasts_data):
-                labels_p, labels_p_mask = warp_points(labels_p, M, a)
-                # convert xyxy to xywh
-                labels_p[:, 2:6] = xyxy2xywh(
-                    labels_p[:, 2:6].copy())  # / height
-                labels_p[:, 2] /= width
-                labels_p[:, 3] /= height
-                labels_p[:, 4] /= width
-                labels_p[:, 5] /= height
+        if len(pasts_data) > 0:
+            # convert xyxy to xywh
+            labels_p[:, 2:6] = xyxy2xywh(
+                labels_p[:, 2:6].copy())  # / height
+            labels_p[:, 2] /= width
+            labels_p[:, 3] /= height
+            labels_p[:, 4] /= width
+            labels_p[:, 5] /= height
 
-        plotFlag = False
+        plotFlag = True
         if plotFlag:
             import matplotlib
             matplotlib.use('Agg')
@@ -890,10 +893,10 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 img = np.fliplr(img)
                 if nL > 0:
                     labels[:, 2] = 1 - labels[:, 2]
-                    if len(futures_data):
-                        labels_f[:, 2] = 1 - labels_f[:, 2]
-                    if len(pasts_data):
-                        labels_p[:, 2] = 1 - labels_p[:, 2]
+                    # if len(futures_data):
+                    #     labels_f[:, 2] = 1 - labels_f[:, 2]
+                    # if len(pasts_data):
+                    #     labels_p[:, 2] = 1 - labels_p[:, 2]
 
         img = np.ascontiguousarray(img[:, :, ::-1])  # BGR to RGB
 

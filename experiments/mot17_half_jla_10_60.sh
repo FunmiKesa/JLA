@@ -1,7 +1,7 @@
 cd src
-CUDA_VISIBLE_DEVICES='0,1' python train.py mot \
---exp_id 'testNonEncodedDLAfeatures' \
---desc 'Goal: test dla features without reversing the past input' \
+CUDA_VISIBLE_DEVICES='0,1' python train2.py mot \
+--exp_id 'testAugment' \
+--desc 'Goal: augment normal labels but do not augment forecast and past labels' \
 --arch 'rnnforecast_34' \
 --load_model '../models/ctdet_coco_dla_2x.pth' \
 --data_cfg '../src/lib/cfg/mot17_half.json' \
@@ -20,5 +20,5 @@ CUDA_VISIBLE_DEVICES='0,1' python train.py mot \
 # --rank '0' \
 
 
-python track_half.py mot --load_model ../exp/mot/testNonEncodedDLAfeatures/model_last.pth --conf_thres 0.4 --val_mot17 --exp_id testNonEncodedDLAfeatures --arch rnnforecast_34 --forecast --use_embedding --no_kf --past_length 10 --future_length 60
+python track_half.py mot --load_model ../exp/mot/testAugment/model_last.pth --conf_thres 0.4 --val_mot17 --exp_id testAugment --arch rnnforecast_34 --forecast --use_embedding --no_kf --past_length 10 --future_length 60
 
