@@ -11,7 +11,8 @@ import torch
 import torch.utils.data
 from torchvision.transforms import transforms as T
 from opts import opts
-from models.model import create_model, load_model, save_model, create_model_forecast
+from models.model import create_model, load_model, save_model
+from models.data_parallel import DataParallel
 from logger import Logger
 from datasets.dataset_factory import get_dataset
 from trains.train_factory import train_factory
@@ -40,8 +41,7 @@ def main(opt):
     opt.device = torch.device('cuda' if opt.gpus[0] >= 0 else 'cpu')
 
     print('Creating model...')
-    model = create_model_forecast(opt.arch, opt.heads, opt.head_conv, opt) if opt.forecast else create_model(
-        opt.arch, opt.heads, opt.head_conv)
+    model = create_model(opt.arch, opt.heads, opt.head_conv)
     optimizer = torch.optim.Adam(model.parameters(), opt.lr)
     start_epoch = 0
 
@@ -65,6 +65,7 @@ def main(opt):
         model, optimizer, start_epoch = load_model(
             model, opt.load_model, trainer.optimizer, opt.resume, opt.lr, opt.lr_step)
 
+    best = 1e10
     for epoch in range(start_epoch + 1, opt.num_epochs + 1):
         mark = epoch if opt.save_all else 'last'
         log_dict_train, _ = trainer.train(epoch, train_loader)
@@ -94,6 +95,5 @@ def main(opt):
 
 
 if __name__ == '__main__':
-    # os.environ['CUDA_VISIBLE_DEVICES'] = '0, 1'
     opt = opts().parse()
     main(opt)
