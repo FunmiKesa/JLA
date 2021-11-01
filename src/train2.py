@@ -11,7 +11,7 @@ import torch
 import torch.utils.data
 from torchvision.transforms import transforms as T
 from opts import opts
-from models.model import create_model, load_model, save_model
+from models.model import create_model, load_model, save_model, save_forecast_model
 from models.data_parallel import DataParallel
 from logger import Logger
 from datasets.dataset_factory import get_dataset
@@ -42,9 +42,12 @@ def main(opt):
 
     print('Creating model...')
     model = create_model(opt.arch, opt.heads, opt.head_conv)
+
+    # save_forecast_model("../models/jla.pth", "../models/forecast_jla.pth")
+    
     optimizer = torch.optim.Adam(model.parameters(), opt.lr)
     start_epoch = 0
-
+    print( opt.load_model)
     # Get dataloader
 
     train_loader = torch.utils.data.DataLoader(
@@ -64,6 +67,8 @@ def main(opt):
     if opt.load_model != '':
         model, optimizer, start_epoch = load_model(
             model, opt.load_model, trainer.optimizer, opt.resume, opt.lr, opt.lr_step)
+
+    model = load_model(model, "../models/forecast_jla.pth")
 
     best = 1e10
     for epoch in range(start_epoch + 1, opt.num_epochs + 1):

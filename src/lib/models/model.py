@@ -38,7 +38,7 @@ def load_model(model, model_path, optimizer=None, resume=False,
   # loc = f"cuda:{model.device_ids[0]}"
   # print(loc)
   checkpoint = torch.load(model_path, map_location=lambda storage, loc: storage)
-  print('loaded {}, epoch {}'.format(model_path, checkpoint['epoch']))
+  print('loaded {}, epoch {}'.format(model_path, checkpoint.get('epoch', 0)))
   state_dict_ = checkpoint['state_dict']
   state_dict = {}
   
@@ -105,3 +105,24 @@ def save_model(path, epoch, model, optimizer=None):
     data['optimizer'] = optimizer.state_dict()
   torch.save(data, path)
 
+def save_forecast_model(model, path):
+  if isinstance(model, torch.nn.DataParallel):
+    state_dict_ = model.module.state_dict()
+  elif isinstance(model, torch.nn.parallel.DistributedDataParallel):
+    if torch.distributed.get_rank() != 0:
+      return
+    state_dict_ = model.module.state_dict()
+  elif os.path.exists(model):
+    checkpoint = torch.load(model, map_location=lambda storage, loc: storage)
+    state_dict_ = checkpoint['state_dict']
+  state_dict = {}
+
+  for k in state_dict_.keys():
+    if k.startswith('rnn'):
+      state_dict[k] = state_dict_[k]
+  data = {
+    'state_dict': state_dict
+  }
+  print(state_dict.keys())
+
+  torch.save(data, path)

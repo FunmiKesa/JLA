@@ -127,7 +127,7 @@ def main_worker(gpu, ngpus_per_node, opt):
         train_sampler = None
 
     train_loader = torch.utils.data.DataLoader(
-        dataset, batch_size=opt.batch_size, shuffle=(train_sampler is None), num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler)
+        dataset, batch_size=opt.batch_size, shuffle=(train_sampler is None), num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler, drop_last=True)
 
     print('Starting training...')
     Trainer = train_factory[opt.task]
