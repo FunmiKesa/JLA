@@ -1,0 +1,50 @@
+Bootstrap: docker
+
+# From: continuumio/miniconda3
+From: nvidia/cuda:10.1-cudnn7-devel-ubuntu18.04
+
+%files
+    env.yml
+
+%post
+    # Install some basic utilities
+    apt-get update && apt-get install -y \
+    curl \
+    wget \
+    build-essential \
+    ca-certificates \
+    sudo \
+    git \
+    bzip2 \
+    libx11-6 \
+    ffmpeg libsm6 libxext6 \
+    && rm -rf /var/lib/apt/lists/*
+    
+    # apt-get update && apt-get install -y nvidia-cuda-toolkit
+
+    wget https://repo.anaconda.com/miniconda/Miniconda3-py37_4.10.3-Linux-x86_64.sh
+    sh Miniconda3-py37_4.10.3-Linux-x86_64.sh -bfp /usr/local
+
+    conda config --file /.condarc --add channels defaults
+    conda config --file /.condarc --add channels conda-forge
+    conda update conda
+    conda env create -f env.yml
+    . /usr/local/etc/profile.d/conda.sh
+
+    conda activate $(head -n 1 env.yml | cut -f 2 -d ' ')
+    pip install lap
+    pip install cython-bbox gitpython
+
+    ln -sf /usr/local/cuda-10.1 /usr/local/cuda
+
+
+    python -c 'import torch; from torch.utils.cpp_extension import CUDA_HOME; print(torch.cuda.is_available(), CUDA_HOME)'
+
+    cd /usr/local
+    git clone -b pytorch_1.7 https://github.com/ifzhang/DCNv2.git
+    cd DCNv2
+    ./make.sh
+
+# %runscript
+    # exec /usr/local/conda/envs/$(head -n 1 env.yml | cut -f 2 -d ' ')/bin/"$@"
+
