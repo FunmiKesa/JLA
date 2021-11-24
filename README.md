@@ -5,7 +5,7 @@
 
 We extend [FairMOT](https://github.com/ifzhang/FairMOT) with a forecast head to predict current and future objects locations:
 
-![](assets/pipeline.png)
+![](assets/pipeline.jpg)
 
 > [**Multiple Object Tracking and Forecasting: Jointly Predicting Current and Future Object Locations**](https://arxiv.org/abs/2108.10543)
 
