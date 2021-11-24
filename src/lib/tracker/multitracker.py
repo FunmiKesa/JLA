@@ -515,13 +515,10 @@ class JDETracker(object):
 
         ''' Step 2: First association, with embedding'''
         strack_pool = joint_stracks(tracked_stracks, self.lost_stracks)
-        # Predict the current location with KF
-        # for strack in strack_pool:
-        # strack.predict()
         u_track, u_detection = range(len(strack_pool)), range(len(detections))
         dists = matching.embedding_distance(strack_pool, detections)
-        # dists = matching.iou_distance(strack_pool, detections)
         if self.use_kf:
+            # Predict the current location with KF
             if self.forecast:
                 STrack.multi_predict_n(strack_pool)
                 STrack.multi_predict(strack_pool)
@@ -566,8 +563,6 @@ class JDETracker(object):
         for itracked, idet in matches:
             track = r_tracked_stracks[itracked]
             det = detections[idet]
-            # if len(track.forecasts):
-                # det._tlwh = STrack.tlbr_to_tlwh(np.asarray([track.forecasts[track.time_since_update+1], det.tlbr]).mean(axis=0))
             track.time_since_update = 0
             if track.state == TrackState.Tracked:
                 track.update(det, self.frame_id)
@@ -580,7 +575,6 @@ class JDETracker(object):
         if self.forecast:
             r_tracked_stracks = [r_tracked_stracks[i] for i in u_track if r_tracked_stracks[i].state == TrackState.Tracked]
             forecasts, inds = get_forecast_distance(r_tracked_stracks, (width, height))
-            # forecasts, inds = get_forecast(r_tracked_stracks)
             r_tracks =  [t for i, t in enumerate(r_tracked_stracks) if i not in inds]
             r_tracked_stracks = [r_tracked_stracks[i] for i in inds]
             for track in r_tracks:
@@ -608,9 +602,6 @@ class JDETracker(object):
                 track.mark_lost()
                 lost_stracks.append(track)
 
-        # r_tracked_stracks = [r_tracked_stracks[i] for i in u_track ]
-        
-
         '''Deal with unconfirmed tracks, usually tracks with only one beginning frame'''
         detections = [detections[i] for i in u_detection]
         dists = matching.iou_distance(unconfirmed, detections)
@@ -636,8 +627,6 @@ class JDETracker(object):
             if self.frame_id - track.end_frame > self.max_time_lost:
                 track.mark_removed()
                 removed_stracks.append(track)
-
-        # print('Ramained match {} s'.format(t4-t3))
 
         self.tracked_stracks = [
             t for t in self.tracked_stracks if t.state == TrackState.Tracked]
@@ -667,76 +656,18 @@ class JDETracker(object):
         logger.debug('Removed: {}'.format(
             [track.track_id for track in removed_stracks]))
 
-        viz = False
-        # viz = True
-        focus = [0, 2, 5, 7, 1, 29]
-        if viz and (self.frame_id % 1 == 0) :
-            os.environ['DISPLAY'] = 'localhost:11.0'
-            cv2.namedWindow("forecasts",cv2.WINDOW_NORMAL)
-            img = img0.copy()
-            tl = round(0.0004 * max(img.shape[0:2])) + 1
-            tf = max(tl - 1, 1)  # font thickness
-            colors  = [(0, 255, 251), (0, 255, 0), (0, 0, 255)]
-
-            tracks = output_stracks+ detections_copy  + lost_stracks
-            for t in tracks:
-                if (t.track_id not in focus):
-                    continue
-
-                bbox = t.tlbr
-                bbox = [int(v) for v in bbox]
-                color = colors[t.state]
-                cv2.rectangle(img, (bbox[0], bbox[1]),
-                                (bbox[2], bbox[3]),color , 2)
-                # color = [random.randint(0, 255) for _ in range(3)]
-                
-                label = f"{t.track_id}-{ int(t.score * 100)}"
-                t_size = cv2.getTextSize(
-                        label, 0, fontScale=tl / 3, thickness=tf)[0]
-                up = bbox[3] if t.state == 0 else bbox[1]
-                c1, c2 = (bbox[0], up
-                                ), (bbox[2], bbox[3])
-                    
-                # c2 = c1[0] + t_size[0], c1[1] - t_size[1] - 3
-                # cv2.rectangle(img, c1, c2, color, -1)
-                cv2.putText(img, label, (c1[0], c1[1] - 2), 0, tl / 3,
-                            color, thickness=tf, lineType=cv2.LINE_AA)
-                color = (255, 255, 0)
-                if t.state == 2 and len(t.forecasts):
-                    ind =(track.forecast_index + 1) * track.time_since_update
-                    bbox_pred = t.forecasts[ind]
-                    bbox_pred = [int(v) for v in bbox_pred]
-                    cv2.rectangle(
-                        img, (bbox_pred[0], bbox_pred[1]), (bbox_pred[2], bbox_pred[3]), color, 2)
-                    up = bbox_pred[3] if t.state == 0 else bbox[1]
-                    c1, c2 = (bbox_pred[0], up
-                                ), (bbox_pred[2], bbox_pred[3])
-                    cv2.putText(img, label, (c1[0], c1[1] - 2), 0, tl / 3,
-                            color, thickness=tf, lineType=cv2.LINE_AA)
-
-                    for j in range(0, len(t.forecasts), 5):
-                        bbox_pred = t.forecasts[j]
-                        bbox_pred = [int(v) for v in bbox_pred]
-                        cx, cy = (
-                            bbox_pred[0] + bbox_pred[2]) // 2, (bbox_pred[1] + bbox_pred[3]) // 2
-                        # cv2.rectangle(img, (bbox_pred[0], bbox_pred[1]), (bbox_pred[2], bbox_pred[3]), (255, 0, j+100), 2)
-
-                        cv2.rectangle(img, (cx, cy), (cx+j, cy+j), color, 2)
-            
-            
-            cv2.imshow('forecasts', img)
-            cv2.waitKey(1)
-       
         return output_stracks
     
 def frame_distance(xywh, img_size):
 
     width, height = img_size
     center = [width / 2.0, height / 2.0]
+
     # convert to xywh
     centerx = np.linalg.norm(center[:2])
 
     xywh = np.array(xywh)
+
     # calculate the distance of the object with respect to the center of the frame
     dist = np.linalg.norm(xywh[:,:2] - center, axis=1) / centerx
 
@@ -744,14 +675,9 @@ def frame_distance(xywh, img_size):
  
 
 def forecast_track_in_frame(track, img_size=()):
-    # print(track, track.time_since_update, frame_id, track.score )
-    # if track.forecast_index > 0:
-    #     print(track.forecast_index, track.time_since_update)
     pred = None
 
     futures = track.forecasts
-    # if len(futures) < 10: 
-    #     return pred
     track.time_since_update += 1
 
     max_threshold = 20
@@ -768,7 +694,6 @@ def forecast_track_in_frame(track, img_size=()):
     xywh[0] += xywh[2] / 2
     xywh[1] += xywh[3] / 2
 
-    # f = (1-track.forecast_score) * (track.time_since_update)/ max_threshold
     tsu = track.time_since_update/max_threshold 
 
     lambda_ = 0.5
@@ -778,11 +703,7 @@ def forecast_track_in_frame(track, img_size=()):
 
     if f > 0.55:
         return pred
-    
-    
-    
-    # track.forecast_index += track.time_since_update
-    # track.forecast_index   =   forecast_index
+
     pred = STrack(tlwh, track.score, track.smooth_feat, 30, past_length=track.past_length)
     return pred
 

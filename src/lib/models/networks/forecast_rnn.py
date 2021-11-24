@@ -10,8 +10,9 @@ class EncoderRNN(nn.Module):
         self.encoder1 = nn.GRUCell(input_size, self.num_hidden)
 
     def forward(self, input):
-        context = torch.zeros(input.size(
-            0), self.num_hidden, dtype=torch.float, device=input.device)
+        context = torch.zeros(
+            input.size(0), self.num_hidden, dtype=torch.float, device=input.device
+        )
 
         forecast_sequence = input.size()[1]
         for i in range(forecast_sequence):
@@ -27,7 +28,7 @@ class DecoderRNN(nn.Module):
         self.input_size = input_size
         self.output_size = output_size
         self.use_embedding = use_embedding
-        self.decoder1 = nn.GRUCell(int(self.num_hidden/2), self.num_hidden)
+        self.decoder1 = nn.GRUCell(int(self.num_hidden / 2), self.num_hidden)
         h = self.num_hidden if use_embedding else self.num_hidden // 2
         self.decoder2 = nn.GRUCell(h, self.num_hidden)
         self.fc_in = nn.Linear(self.num_hidden, self.input_size)
@@ -35,23 +36,24 @@ class DecoderRNN(nn.Module):
         self.relu_context = nn.ReLU()
         self.relu_output = nn.ReLU()
         self.relu_dla_features = nn.ReLU()
-        self.context_encoder = nn.Linear(
-            self.num_hidden, int(self.num_hidden / 2))
+        self.context_encoder = nn.Linear(self.num_hidden, int(self.num_hidden / 2))
         self.dla_encoder = nn.Linear(self.num_hidden // 2, int(self.num_hidden / 2))
 
-    def forward(self, context, dla_features=None, future_length=5,  past_length=10):
+    def forward(self, context, dla_features=None, future_length=5, past_length=10):
         outputs = []
+
         # Fully connected
         encoded_context = self.context_encoder(context)
+
         # Relu
         encoded_context = self.relu_context(encoded_context)
         result = []
-        # if self.training:
+
         # generate input
         decoded_inputs = []
         h_t = context
 
-        for i in range(past_length-1, -1, -1):
+        for i in range(past_length - 1, -1, -1):
             h_t = self.decoder1(encoded_context, h_t)
             input = self.fc_in(h_t)
             # decoded_inputs.insert(0, input)
@@ -60,8 +62,8 @@ class DecoderRNN(nn.Module):
         result.append(decoded_inputs)
 
         if self.use_embedding:
-            encoded_dla_features = self.dla_encoder(dla_features)
-            encoded_dla_features = self.relu_dla_features(encoded_dla_features)
+            # encoded_dla_features = self.dla_encoder(dla_features)
+            # encoded_dla_features = self.relu_dla_features(encoded_dla_features)
             encoded_context = torch.cat((encoded_context, dla_features), 1)
 
         h_t = context
@@ -85,7 +87,9 @@ class Cumsum(nn.Module):
 
 
 class ForeCastRNN(nn.Module):
-    def __init__(self, input_size, output_size, future_length, num_hidden, use_embedding=False):
+    def __init__(
+        self, input_size, output_size, future_length, num_hidden, use_embedding=False
+    ):
         super(ForeCastRNN, self).__init__()
         self.num_hidden = num_hidden
         self.input_size = input_size
@@ -94,7 +98,8 @@ class ForeCastRNN(nn.Module):
         self.use_embedding = use_embedding
         self.encoder = EncoderRNN(self.input_size, self.num_hidden)
         self.decoder = DecoderRNN(
-            input_size, output_size, self.num_hidden, self.use_embedding)
+            input_size, output_size, self.num_hidden, self.use_embedding
+        )
 
         self.final = Cumsum()
 
@@ -103,7 +108,8 @@ class ForeCastRNN(nn.Module):
         past_length = prev_bboxes.shape[1]
 
         output = self.decoder(
-            context, features, self.future_length, past_length=past_length)
+            context, features, self.future_length, past_length=past_length
+        )
 
         last = prev_bboxes[:, -1:, :4]
         output[-1] = self.final(last, output[-1])
