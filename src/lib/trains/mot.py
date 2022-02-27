@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 
-from models.losses import FocalLoss, TripletLoss
+from models.losses import FocalLoss, IOUloss, TripletLoss
 from models.losses import RegL1Loss, RegLoss, NormRegL1Loss, RegWeightedL1Loss
 from models.decode import mot_decode
 from models.utils import _sigmoid, _tranpose_and_gather_feat
@@ -20,6 +20,7 @@ from .base_trainer import BaseTrainer
 class MotLoss(torch.nn.Module):
     def __init__(self, opt):
         super(MotLoss, self).__init__()
+        self.iou_loss = IOUloss(reduction='mean')
         self.crit = torch.nn.MSELoss() if opt.mse_loss else FocalLoss()
         self.crit_reg = RegL1Loss() if opt.reg_loss == 'l1' else \
             RegLoss() if opt.reg_loss == 'sl1' else None
@@ -74,41 +75,45 @@ class MotLoss(torch.nn.Module):
 
                 pred_pasts, pred_futures = output['fct']
 
-                if opt.pasts_weight:
-                    pasts = batch['input'][-1]
+                if opt.pasts_weight > 0:
+                    pasts = batch['pasts']
                     pasts_mask = batch['pasts_mask']
-                    batch_size, max_objs, past_length, input_size = pasts_mask.shape
 
                     pasts_mask = pasts_mask.view(-1, pasts_mask.size(
-                        2), pasts_mask.size(3)).contiguous().float()
+                        -2), pasts_mask.size(-1)).contiguous().float()
 
                     pasts = pasts.view(-1, pasts.size(
-                        2), pasts.size(3)).contiguous().float()
+                        -2), pasts.size(-1)).contiguous().float()
 
-                    pred_pasts = pred_pasts * pasts_mask
-                    pasts = pasts * pasts_mask
+                    
+                    pasts_mask= pasts_mask.type(torch.bool)[...,0]
+                    pred_pasts =pred_pasts[...,:4][pasts_mask]
+                    pasts = pasts[...,:4][pasts_mask]
 
-                    pasts_loss = pasts_loss + \
-                        F.l1_loss(pred_pasts, pasts, reduction='sum') / \
-                        (pasts_mask.sum() + 1e-4) / opt.num_stacks
+                    pasts_loss += F.l1_loss(pred_pasts, pasts, reduction='mean')
 
-                if opt.futures_weight:
+                    pasts_loss +=self.iou_loss(pred_pasts, pasts)
+
+                    pasts_loss /= opt.num_stacks
+
+                if opt.futures_weight > 0:
                     futures = batch['futures']
                     futures_mask = batch['futures_mask']
-                    batch_size, max_objs, future_length, input_size = futures_mask.shape
 
                     futures_mask = futures_mask.view(-1, futures_mask.size(
-                        2), futures_mask.size(3)).contiguous().float()
+                        -2), futures_mask.size(-1)).contiguous().float()
                     futures = futures.view(-1, futures.size(
-                        2), futures.size(3)).contiguous().float()
+                        -2), futures.size(-1)).contiguous().float()
 
-                    pred_futures = pred_futures * futures_mask
-                    futures = futures * futures_mask
 
-                    futures_loss = futures_loss + F.l1_loss(pred_futures, futures, reduction='sum') / (
-                        futures_mask.sum() + 1e-4) / opt.num_stacks
+                    futures_mask= futures_mask.type(torch.bool)[...,0]
+                    pred_futures = pred_futures[...,:4][futures_mask]
+                    futures = futures[...,:4][futures_mask]
 
-        fct_loss = opt.pasts_weight * pasts_loss + opt.futures_weight * futures_loss
+                    futures_loss += F.l1_loss(pred_futures, futures, reduction='mean')
+
+                    futures_loss += self.iou_loss(pred_futures, futures) / opt.num_stacks
+                    futures_loss /= opt.num_stacks
 
         det_loss = opt.hm_weight * hm_loss + opt.wh_weight * \
             wh_loss + opt.off_weight * off_loss
@@ -117,14 +122,17 @@ class MotLoss(torch.nn.Module):
             torch.exp(-self.s_id) * id_loss + (self.s_det + self.s_id)
 
         if self.opt.forecast:
+            fct_loss = opt.pasts_weight * pasts_loss + opt.futures_weight * futures_loss
             loss += torch.exp(-self.s_fct) * fct_loss + self.s_fct
         loss *= 0.5
 
         loss_stats = {'loss': loss, 'hm_loss': hm_loss,
                       'wh_loss': wh_loss, 'off_loss': off_loss, 'id_loss': id_loss}
         if self.opt.forecast:
-            loss_stats['f_loss'] = futures_loss
-            loss_stats['p_loss'] = pasts_loss
+            if opt.futures_weight > 0:
+                loss_stats['f_loss'] = futures_loss
+            if opt.pasts_weight > 0:
+                loss_stats['p_loss'] = pasts_loss
         return loss, loss_stats
 
 
@@ -133,11 +141,31 @@ class MotTrainer(BaseTrainer):
         super(MotTrainer, self).__init__(opt, model, optimizer=optimizer)
 
     def _get_losses(self, opt):
-        loss_stats = ['loss', 'hm_loss', 'wh_loss', 'off_loss', 'id_loss']
+        weights = {
+            "wh_loss":opt.wh_weight,
+            "off_loss": opt.off_weight,
+            "id_loss" : opt.id_weight,
+            "loss": 1,
+            "hm_loss":1
+        }
+
         if opt.forecast:
-            loss_stats += ['f_loss', 'p_loss']
+            weights.update({
+                "f_loss": opt.futures_weight,
+                "p_loss": opt.pasts_weight
+            })
+
+
+        # validate loss weight is greater than 0:
+        loss_stats = list(weights.keys())
+        for k in loss_stats:
+            if weights[k] <= 0:
+                del weights[k]
+
+        loss_stats = list(weights.keys())
 
         loss = MotLoss(opt)
+
         return loss_stats, loss
 
     def save_result(self, output, batch, results):

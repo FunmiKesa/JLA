@@ -55,6 +55,8 @@ def gen_future_files(
         # convert the original size
         bbox[:, [2, 4]] *= seq_width
         bbox[:, [3, 5]] *= seq_height
+        bbox[:, [2, 4]] = bbox[:, [2, 4]].round(2)
+        bbox[:, [3, 5]]  = bbox[:, [3, 5]].round(2)
         bbox[:, 0] = fid
         bboxes += [bbox]
 
@@ -232,13 +234,10 @@ if __name__ == "__main__":
 
         prefix_str = f"{d}"
 
-        with ProcessPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
-
-            futures = [
-                executor.submit(main, d, future_label, future_length) for f in range(10)
-            ]  # submit the processes: extract_frames(...)
+        num_workers = min(6, multiprocessing.cpu_count())
+        with ProcessPoolExecutor(max_workers=num_workers) as executor:
+            futures = [executor.submit(main, d, future_label, future_length)
+                    for f in range(10)]  # submit the processes: extract_frames(...)
 
             for i, f in enumerate(as_completed(futures)):  # as each process completes
-                print_progress(
-                    i, 10 - 1, prefix=prefix_str, suffix="Complete"
-                )  # print it's progress
+                print_progress(i, 10-1, prefix=prefix_str, suffix='Complete')  # print it's progress

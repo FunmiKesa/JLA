@@ -76,8 +76,8 @@ class JDETracker(object):
             dh = (inp_height - new_shape[1]) / 2  # height padding
             rw = ratio * width / inp_width
             rh = ratio * height / inp_height
-            output_h = inp_height // self.opt.down_ratio
-            output_w = inp_width // self.opt.down_ratio
+            output_h = new_shape[1] // self.opt.down_ratio
+            output_w = new_shape[0] // self.opt.down_ratio
             objs_count = 0
             bboxes = []
 
@@ -128,15 +128,16 @@ class JDETracker(object):
 
                 pred_futures[..., [0, 2]] /= output_w
                 pred_futures[..., [1, 3]] /= output_h
-                pred_futures[..., [1, 3]] *= inp_height
                 pred_futures[..., [0, 2]] *= inp_width
+                pred_futures[..., [1, 3]] *= inp_height
                 pred_futures = xywh2xyxy(pred_futures.copy())
-                pred_futures[..., [1, 3]] -= dh
                 pred_futures[..., [0, 2]] -= dw
+                pred_futures[..., [1, 3]] -= dh
                 pred_futures /= ratio
-               
-                # pred_futures[..., [0,2]] = np.clip(pred_futures[..., [0,2]], 0, width)
-                # pred_futures[..., [1,3]] = np.clip(pred_futures[..., [1,3]], 0, height)
+
+                if self.opt.clip:
+                    pred_futures[..., [0,2]] = np.clip(pred_futures[..., [0,2]], 0, width)
+                    pred_futures[..., [1,3]] = np.clip(pred_futures[..., [1,3]], 0, height)
         return track_ids, pred_futures
 
 
@@ -244,7 +245,7 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
 
             from forecast_utils import evaluation
             aiou, fiou, ade, fde = evaluation.eval_seq(
-                future_label_root, pred_length=60, pred_folder=f"pred_{exp_name}", fixed_length=True)
+                future_label_root, pred_length=opt.future_length, pred_folder=f"pred_{exp_name}", fixed_length=True)
             aious.append(aiou)
             fious.append(fiou)
             ades.append(ade)

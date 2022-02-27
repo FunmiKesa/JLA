@@ -380,14 +380,16 @@ class JDETracker(object):
             bboxes = []
 
             strack_pool = list(self.tracked_stracks) #joint_stracks(self.tracked_stracks, self.lost_stracks)
-            strack_pool = [t for t in strack_pool if t.time_since_update == 0 and t.state == TrackState.Tracked]
+            # strack_pool = [t for t in strack_pool if t.time_since_update == 0 and t.state == TrackState.Tracked]
             pasts = np.zeros(
                 (self.max_per_image, self.past_length, self.input_size), dtype=np.float32)
             if len(strack_pool) > 0:
                 for t in strack_pool:
                     bbox = np.zeros((self.past_length+1, 4), dtype=np.float32)
                     if len(t.pasts) > 1:
-                        t_pasts = np.array(t.pasts)
+                        t_pasts = t.pasts.copy()
+                        t_pasts.append([self.frame_id, t.track_id] + list(t.tlbr))
+                        t_pasts = np.array(t_pasts)
                         t_pasts = t_pasts[::-1] # reverse order
                         bbox[:t_pasts.shape[0], :] = t_pasts[:, 2:]
                         bboxes.append(bbox)
@@ -684,7 +686,9 @@ def forecast_track_in_frame(track, img_size=()):
     if (track.tracklet_len + len(track.pasts)) < (track.past_length+5):
         return pred
 
-    forecast_index = (track.forecast_index + 1) * track.time_since_update
+    # forecast_index = (track.forecast_index + 1) * track.time_since_update
+    forecast_index = track.forecast_index #* track.time_since_update
+    track.forecast_index = 0
     if forecast_index >= len(futures):
         return pred
 
