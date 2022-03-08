@@ -742,31 +742,42 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 bbox_xys[k] = bbox_xy
 
         if self.forecast:
-            if len(f_data):
+            if len(f_data) and len(p_data):
                 futures_data[f_data_mask] = f_data
                 futures_data[f_data_mask == False] = 0
 
+                pasts_data[p_data_mask] = p_data
+                pasts_data[p_data_mask == False] = 0
+
                 futures_data = futures_data.reshape(-1, self.future_length, 6)
+                f_mask = f_mask.reshape(-1, self.future_length, 4)
+
+                pasts_data = pasts_data.reshape(-1, self.past_length + 1, 6)
+                p_mask = p_mask.reshape(-1, self.past_length + 1, 4)[:, 1:, :]
+
+                # filter matching track id
+                futures_trackids = futures_data[:, 0, 1]
+                pasts_trackids = pasts_data[:, 0, 1]
+
+                _, pasts_comm, futures_comm = np.intersect1d(pasts_trackids, futures_trackids, return_indices=True)
+
+                futures_data = futures_data[futures_comm]
+                f_mask = f_mask[futures_comm]
+                pasts_data = pasts_data[pasts_comm]
+                p_mask = p_mask[pasts_comm]
+
                 labels = futures_data.copy()[..., 2:]
                 inds = futures_data[..., 0, 1]
                 labels[..., [0, 2]] *= output_w
                 labels[..., [1, 3]] *= output_h
 
                 futures[: labels.shape[0], ...] = labels
-                f_mask = f_mask.reshape(-1, self.future_length, 4)
                 futures_mask[: f_mask.shape[0], :] = f_mask
                 futures_inds[: f_mask.shape[0]] = inds
 
                 futures = futures * futures_mask
                 futures = futures.astype(np.float32)
                 futures_mask = futures_mask.astype(np.uint8)
-
-            if len(p_data):
-                pasts_data[p_data_mask] = p_data
-                pasts_data[p_data_mask == False] = 0
-
-                pasts_data = pasts_data.reshape(-1, self.past_length + 1, 6)
-                p_mask = p_mask.reshape(-1, self.past_length + 1, 4)[:, 1:, :]
 
                 labels = pasts_data.copy()[..., 2:]
                 inds = pasts_data[:, 0, 1]

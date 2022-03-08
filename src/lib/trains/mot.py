@@ -87,8 +87,8 @@ class MotLoss(torch.nn.Module):
 
                     
                     pasts_mask= pasts_mask.type(torch.bool)[...,0]
-                    pred_pasts =pred_pasts[...,:4][pasts_mask]
-                    pasts = pasts[...,:4][pasts_mask]
+                    pred_pasts =pred_pasts[...,:8][pasts_mask]
+                    pasts = pasts[...,:8][pasts_mask]
 
                     pasts_loss += F.l1_loss(pred_pasts, pasts, reduction='mean')
 
@@ -112,7 +112,7 @@ class MotLoss(torch.nn.Module):
 
                     futures_loss += F.l1_loss(pred_futures, futures, reduction='mean')
 
-                    futures_loss += self.iou_loss(pred_futures, futures) / opt.num_stacks
+                    futures_loss += self.iou_loss(pred_futures, futures)
                     futures_loss /= opt.num_stacks
 
         det_loss = opt.hm_weight * hm_loss + opt.wh_weight * \
