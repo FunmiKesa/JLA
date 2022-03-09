@@ -733,7 +733,8 @@ class RNNForecast(nn.Module):
             self.emb_dim = self.heads["id"]
 
     def forward(self, x):
-        if self.forecast:
+        prev = []
+        if self.forecast and isinstance(x, list):
             prev = x[-1]
             x = x[0]
         x = self.base(x)
@@ -748,7 +749,7 @@ class RNNForecast(nn.Module):
         for head in self.heads:
             z[head] = self.__getattr__(head)(y[-1])
 
-        if self.forecast:
+        if len(prev) > 0:
             f = None
             if "fct" in z:
                 f = z["fct"]

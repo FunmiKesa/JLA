@@ -283,12 +283,14 @@ class JDETracker(object):
             opt.device = torch.device('cuda')
         else:
             opt.device = torch.device('cpu')
-        print('Creating model...')
-        self.model = create_model(
-            opt.arch, opt.heads, opt.head_conv)
-        self.model = load_model(self.model, opt.load_model)
-        self.model = self.model.to(opt.device)
-        self.model.eval()
+        self.model = None
+        if opt.load_model:
+            print('Creating model...')
+            self.model = create_model(
+                opt.arch, opt.heads, opt.head_conv)
+            self.model = load_model(self.model, opt.load_model)
+            self.model = self.model.to(opt.device)
+            self.model.eval()
 
         self.tracked_stracks = []  # type: list[STrack]
         self.lost_stracks = []  # type: list[STrack]
@@ -338,8 +340,15 @@ class JDETracker(object):
                 keep_inds = (results[j][:, 4] >= thresh)
                 results[j] = results[j][keep_inds]
         return results
+    
+    def init_model(self, model):
+        assert model is not None, "Model cannot be none."
+        self.model = model
+        self.model = self.model.to(self.opt.device)
+        self.model.eval()
 
     def update(self, im_blob, img0):
+        assert self.model is not None, "Model must be initialized."
         self.frame_id += 1
         activated_starcks = []
         refind_stracks = []

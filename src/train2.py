@@ -68,7 +68,7 @@ def main(opt):
         model, optimizer, start_epoch = load_model(
             model, opt.load_model, trainer.optimizer, opt.resume, opt.lr, opt.lr_step)
 
-    model = load_model(model, "../models/forecast_jla.pth")
+    # model = load_model(model, "../models/forecast_jla.pth")
 
     best = 1e10
     for epoch in range(start_epoch + 1, opt.num_epochs + 1):
