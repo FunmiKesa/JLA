@@ -20,6 +20,22 @@ class EncoderRNN(nn.Module):
             context = self.encoder1(inp, context)
         return context
 
+    class FFN(nn.Module):
+        def __init__(self, embed_dim, ffn_dim, dropout=0.1):
+            super().__init__()
+            self.linear1 = nn.Linear(embed_dim, ffn_dim)
+            self.activation = nn.ReLU()
+            self.dropout2 = nn.Dropout(dropout)
+            self.linear2 = nn.Linear(ffn_dim, embed_dim)
+            self.dropout3 = nn.Dropout(dropout)
+            self.norm2 = nn.LayerNorm(embed_dim)
+
+        def forward(self, src):
+            src2 = self.linear2(self.dropout2(self.activation(self.linear1(src))))
+            src = src + self.dropout3(src2)
+            src = self.norm2(src)
+
+            return src
 
 class DecoderRNN(nn.Module):
     def __init__(self, input_size, output_size, num_hidden, use_embedding=False):
@@ -28,15 +44,15 @@ class DecoderRNN(nn.Module):
         self.input_size = input_size
         self.output_size = output_size
         self.use_embedding = use_embedding
-        self.decoder1 = nn.GRUCell(int(self.num_hidden / 2), self.num_hidden)
-        h = self.num_hidden if use_embedding else self.num_hidden // 2
+        self.decoder1 = nn.GRUCell(int(self.num_hidden ), self.num_hidden)
+        h = self.num_hidden #if use_embedding else self.num_hidden // 2
         self.decoder2 = nn.GRUCell(h, self.num_hidden)
         self.fc_in = nn.Linear(self.num_hidden, self.input_size)
         self.fc_out = nn.Linear(self.num_hidden, self.output_size)
         self.relu_context = nn.ReLU()
         self.relu_output = nn.ReLU()
         self.relu_dla_features = nn.ReLU()
-        self.context_encoder = nn.Linear(self.num_hidden, int(self.num_hidden / 2))
+        self.context_encoder = nn.Linear(self.num_hidden, int(self.num_hidden))
         self.dla_encoder = nn.Linear(self.num_hidden // 2, int(self.num_hidden / 2))
 
     def forward(self, context, dla_features=None, future_length=5, past_length=10):
@@ -44,6 +60,7 @@ class DecoderRNN(nn.Module):
 
         # Fully connected
         encoded_context = self.context_encoder(context)
+        # encoded_context = context
 
         # Relu
         encoded_context = self.relu_context(encoded_context)
