@@ -4,9 +4,10 @@ from __future__ import print_function
 
 import argparse
 import os
-import sys
 import git
-
+import pprint
+from tabulate import tabulate
+from typing import Dict
 
 class opts(object):
     def __init__(self):
@@ -365,17 +366,47 @@ class opts(object):
         )
         self.parser.add_argument(
             "--dist-url",
-            default="tcp://127.0.0.1:5555",
+            default=None,
             type=str,
             help="url used to set up distributed training",
         )
         self.parser.add_argument(
             "--dist-backend", default="nccl", type=str, help="distributed backend"
         )
-
         self.parser.add_argument(
             "--no_kf", action="store_true", help="Turn off Kalman Filter"
         )
+        self.parser.add_argument(
+            "--fp16",
+            dest="fp16",
+            default=True,
+            action="store_true",
+            help="Adopting mix precision training.",
+        )
+        self.parser.add_argument(
+            "-f",
+            "--exp_file",
+            default=None,
+            type=str,
+            help="plz input your expriment description file",
+        )
+        self.parser.add_argument(
+            "-d", "--devices", default=None, type=int, help="device for training"
+        )
+        self.parser.add_argument(
+            "--num_machines", default=1, type=int, help="num of node for training"
+        )
+        self.parser.add_argument(
+            "--machine_rank", default=0, type=int, help="node rank for multi-node training"
+        )
+        self.parser.add_argument(
+        "-o",
+        "--occupy",
+        dest="occupy",
+        default=False,
+        action="store_true",
+        help="occupy GPU memory first for training.",
+    )
 
     def parse(self, args=""):
         if args == "":
@@ -388,7 +419,8 @@ class opts(object):
         opt.git_commit = sha
         opt.gpus_str = opt.gpus
         opt.gpus = [int(gpu) for gpu in opt.gpus.split(",")]
-        opt.gpus = [i for i in range(len(opt.gpus))] if opt.gpus[0] >= 0 else [-1]
+        opt.gpus = [i for i in range(
+            len(opt.gpus))] if opt.gpus[0] >= 0 else [-1]
         opt.lr_step = [int(i) for i in opt.lr_step.split(",")]
 
         opt.fix_res = not opt.keep_res
@@ -433,11 +465,12 @@ class opts(object):
 
         if opt.resume and opt.load_model == "":
             model_path = (
-                opt.save_dir[:-4] if opt.save_dir.endswith("TEST") else opt.save_dir
+                opt.save_dir[:-
+                             4] if opt.save_dir.endswith("TEST") else opt.save_dir
             )
             opt.load_model = os.path.join(model_path, "model_last.pth")
         return opt
-
+    
     def update_dataset_info_and_set_heads(self, opt, dataset):
         input_h, input_w = dataset.default_resolution
         opt.mean, opt.std = dataset.mean, dataset.std
