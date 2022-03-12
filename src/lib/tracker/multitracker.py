@@ -454,7 +454,9 @@ class JDETracker(object):
             id_feature = id_feature.cpu().numpy()
             pred_futures = None
             if len(selected_strack) > 0:
-                pred_futures = output['fct'][-1]
+                _, pred_futures, probs = output['fct']
+                # print(probs)
+                # probs = probs.squeeze().contiguous() #.sigmoid_()
                 pred_futures = pred_futures.cpu().numpy()
                 # flip back
                 pasts_mask = np.flip(pasts_mask, 1)
@@ -506,6 +508,7 @@ class JDETracker(object):
                 t = selected_strack[tid]
                 forecasts = pred_futures[i]
                 t.forecasts = forecasts
+                # t.forecasts_scores = probs[i]
 
         if len(dets) > 0:
             '''Detections'''
@@ -698,6 +701,8 @@ def forecast_track_in_frame(track, img_size=()):
     # forecast_index = (track.forecast_index + 1) * track.time_since_update
     forecast_index = track.forecast_index #* track.time_since_update
     track.forecast_index = 0
+    # if track.track_id in [1, 21]:
+    #     print(track, track.forecasts_scores[forecast_index], forecast_index)
     if forecast_index >= len(futures):
         return pred
 
@@ -712,9 +717,10 @@ def forecast_track_in_frame(track, img_size=()):
     lambda_ = 0.5
     if len(img_size):
         f_dist = frame_distance([xywh], img_size)[0]
-        f = lambda_  * f_dist + (1-lambda_)  * tsu
+        # f = lambda_  * f_dist + (1-lambda_)  * tsu
+        f = (1-f_dist) * (1-tsu)
 
-    if f > 0.55:
+    if f < 0.15:
         return pred
 
     pred = STrack(tlwh, track.score, track.smooth_feat, 30, past_length=track.past_length)
