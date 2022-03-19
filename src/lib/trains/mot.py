@@ -40,6 +40,7 @@ class MotLoss(torch.nn.Module):
         if opt.forecast:
             self.FCTLoss = nn.MSELoss()
             self.s_fct = nn.Parameter(3.94 * torch.ones(1))
+            # self.mask_loss = nn.BCELoss(reduction="mean")
 
 
     def forward(self, outputs, batch):
@@ -114,10 +115,18 @@ class MotLoss(torch.nn.Module):
                     futures_loss += F.l1_loss(pred_futures, futures, reduction='mean')
 
                     futures_loss += self.iou_loss(pred_futures, futures)
+
+                    futures_mask = futures_mask.type(torch.float)
+                    # probs = probs * futures_mask
+
+                    # ploss = self.mask_loss(probs, futures_mask)
+                    # ploss = F.binary_cross_entropy_with_logits(probs, futures_mask, reduction='none').sum() / (futures_mask.sum() + 1e-10)
+                    ploss = F.l1_loss(probs, futures_mask, reduction='mean').sum() #/ (futures_mask.sum() + 1e-10)
+                    
+                    futures_loss += ploss
+
                     futures_loss /= opt.num_stacks
 
-                    # ploss = F.binary_cross_entropy_with_logits(probs.squeeze(), futures_mask.type(torch.float))
-                    # futures_loss += ploss
 
         det_loss = opt.hm_weight * hm_loss + opt.wh_weight * \
             wh_loss + opt.off_weight * off_loss

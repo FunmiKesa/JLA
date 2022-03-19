@@ -15,11 +15,14 @@ from models.model import create_model, load_model, save_model, save_forecast_mod
 from models.data_parallel import DataParallel
 from logger import Logger
 from datasets.dataset_factory import get_dataset
+from tracking_utils.utils import init_seeds
 from trains.train_factory import train_factory
+from utils.metric import occupy_mem
 
 
 def main(opt):
-    torch.manual_seed(opt.seed)
+    # torch.manual_seed(opt.seed)
+    init_seeds(opt.seed)
     torch.backends.cudnn.benchmark = not opt.not_cuda_benchmark and not opt.test
 
     print('Setting up data...')
@@ -63,6 +66,8 @@ def main(opt):
     Trainer = train_factory[opt.task]
     trainer = Trainer(opt, model, optimizer)
     trainer.set_device(opt.gpus, opt.chunk_sizes, opt.device)
+    if opt.occupy:
+         (occupy_mem(i) for i in opt.gpus)
 
     if opt.load_model != '':
         model, optimizer, start_epoch = load_model(

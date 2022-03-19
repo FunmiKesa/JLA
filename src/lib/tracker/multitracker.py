@@ -456,7 +456,7 @@ class JDETracker(object):
             if len(selected_strack) > 0:
                 _, pred_futures, probs = output['fct']
                 # print(probs)
-                # probs = probs.squeeze().contiguous() #.sigmoid_()
+                # probs = probs.squeeze().contiguous().sigmoid_()
                 pred_futures = pred_futures.cpu().numpy()
                 # flip back
                 pasts_mask = np.flip(pasts_mask, 1)
@@ -508,7 +508,7 @@ class JDETracker(object):
                 t = selected_strack[tid]
                 forecasts = pred_futures[i]
                 t.forecasts = forecasts
-                # t.forecasts_scores = probs[i]
+                t.forecasts_scores = probs[i]
 
         if len(dets) > 0:
             '''Detections'''
@@ -702,7 +702,7 @@ def forecast_track_in_frame(track, img_size=()):
     forecast_index = track.forecast_index #* track.time_since_update
     track.forecast_index = 0
     # if track.track_id in [1, 21]:
-    #     print(track, track.forecasts_scores[forecast_index], forecast_index)
+    print(track, track.forecasts_scores[forecast_index], forecast_index)
     if forecast_index >= len(futures):
         return pred
 

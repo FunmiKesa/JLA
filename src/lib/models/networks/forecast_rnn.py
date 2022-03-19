@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class EncoderRNN(nn.Module):
@@ -35,7 +36,11 @@ class DecoderRNN(nn.Module):
         self.relu_dla_features = nn.ReLU()
         self.context_encoder = nn.Linear(self.num_hidden, int(self.num_hidden))
         self.dla_encoder = nn.Linear(self.num_hidden // 2, int(self.num_hidden / 2))
-        # self.prob = nn.Linear(self.num_hidden, 1)
+        self.prob = nn.Sequential(
+            nn.Linear(self.num_hidden, 256),
+            nn.ReLU(),
+            nn.Linear(256, 1),
+        ) 
 
     def forward(self, context, dla_features=None, future_length=5, past_length=10):
         outputs = []
@@ -69,11 +74,12 @@ class DecoderRNN(nn.Module):
             output = self.fc_out(self.relu_output(h_t))
             outputs += [output]
             
-            # prob = self.prob(h_t)
-            # probs.append(prob)
+            prob = self.prob(h_t)
+            probs.append(prob)
 
         outputs = torch.stack(outputs, 1)
-        # probs = torch.stack(probs, 1)
+        probs = torch.stack(probs, 1)
+        probs = 1 - probs.squeeze().sigmoid()
 
         result.append(outputs)
         result.append(probs)
