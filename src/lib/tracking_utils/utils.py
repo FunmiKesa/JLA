@@ -436,3 +436,66 @@ def plot_results():
             plt.title(s[i])
             if i == 0:
                 plt.legend()
+
+
+def analyze(acc, hist):
+    groups = acc.mot_events.reset_index()[['FrameId', 'Type', 'HId']].groupby(['FrameId', 'Type'])
+    all = {}
+    part = {}
+    part_idx = {}
+    all_idx = {}
+
+    for (fid, t), grp in groups:
+        fid += 1
+        hId = grp.HId.values
+        if t not in all:
+            all[t] = []
+        all[t].append(len(hId))
+
+        if fid not in all_idx:
+            all_idx[fid] = {}
+
+        all_idx[fid][t] = list(hId)
+
+        if t not in part:
+            part[t] = []
+        idx = []
+        if fid in hist:
+            idx = hist[fid]
+            idx = set(idx).intersection(hId)
+
+            if len(idx) > 0: 
+                if fid not in part_idx:
+                    part_idx[fid] = {}
+                part_idx[fid][t] = idx
+
+        part[t].append(len(idx))
+
+    return all, all_idx, part, part_idx
+
+
+def visualize(all, part, keys=[], filename="out.jpg", legends=["all", "part"]):
+    import matplotlib.pyplot as plt
+
+    total_all = {}
+    total_part = {}
+    for  k in keys:
+        if k in all:
+            total_all[k] = sum(all[k])
+
+        if k in part:
+            total_part[k] = sum(part[k])
+
+    all_values = list(np.array(list(total_all.values())) - np.array(list(total_part.values())))
+    part_values = list(total_part.values())
+
+    width = 0.35
+    colors = plt.cm.BuPu(np.linspace(0.5, 1, len(keys)))
+
+    plt.bar(total_all.keys(), all_values, width, bottom=part_values, color=colors[1])
+    plt.bar(total_part.keys(), part_values, width, color=colors[0])
+    plt.xticks(keys)
+    # ax.set_yticks()
+    plt.legend(labels=legends)
+    plt.savefig(filename)   
+    plt.close()
