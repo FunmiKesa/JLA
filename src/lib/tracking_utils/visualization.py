@@ -1,3 +1,4 @@
+from curses.ascii import alt
 import numpy as np
 import cv2
 
@@ -40,6 +41,7 @@ def plot_tracking(image, tlwhs, obj_ids, scores=None, frame_id=0, fps=0., ids2=N
                 (0, int(15 * text_scale)), cv2.FONT_HERSHEY_PLAIN, text_scale, (0, 0, 255), thickness=2)
 
     focus =  [27,21, 1, 2]
+    alt_y = False
     for i, tlwh in enumerate(tlwhs):
         x1, y1, w, h = tlwh
         intbox = tuple(map(int, (x1, y1, x1 + w, y1 + h)))
@@ -55,9 +57,11 @@ def plot_tracking(image, tlwhs, obj_ids, scores=None, frame_id=0, fps=0., ids2=N
         color = get_color(abs(obj_id))
         # color = (255, 255, 255)# get_color(abs(obj_id))
         cv2.rectangle(im, intbox[0:2], intbox[2:4], color=color, thickness=line_thickness)
-        cx,cy = np.clip(intbox[0], 0, im_w - 1), np.clip(intbox[3]+ 30, 0, im_h - 1)
+        y  = intbox[1] - 30 if alt_y else intbox[3]+ 30
+        cx,cy = np.clip(intbox[0], 0, im_w - 1), np.clip(y, 0, im_h - 1)
         cv2.putText(im, id_text, (cx, cy), cv2.FONT_HERSHEY_PLAIN, text_scale, color,
                     thickness=text_thickness)
+        alt_y = not alt_y
     
     # for i, tlwh in enumerate(gt_tlwhs):
     #     x1, y1, w, h = tlwh
@@ -80,7 +84,7 @@ def plot_tracking(image, tlwhs, obj_ids, scores=None, frame_id=0, fps=0., ids2=N
         tlwhs = tlwhs[1:].reshape(-1, 4)
         cx, cy, w, h = tlwhs[0]
         intbox = tuple(map(int, (cx - w/2, cy - h/2, cx + w/2, cy + h/2)))
-        color = get_color(abs(obj_id))
+        color = (255, 255,255) #get_color(abs(obj_id))
         cv2.rectangle(im, intbox[0:2], intbox[2:4], color=color, thickness=line_thickness)
 
         # for j in range(0, len(tlwhs), 5):

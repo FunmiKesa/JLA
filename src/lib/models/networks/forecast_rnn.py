@@ -73,13 +73,15 @@ class DecoderRNN(nn.Module):
             h_t = self.decoder2(encoded_context, h_t)
             output = self.fc_out(self.relu_output(h_t))
             outputs += [output]
-            
-            prob = self.prob(h_t)
+            if self.use_embedding:
+                prob = self.prob(h_t + dla_features)
+            else:
+                prob = self.prob(h_t)
             probs.append(prob)
 
         outputs = torch.stack(outputs, 1)
         probs = torch.stack(probs, 1)
-        probs = 1 - probs.squeeze().sigmoid()
+        probs = probs.squeeze().sigmoid()
 
         result.append(outputs)
         result.append(probs)

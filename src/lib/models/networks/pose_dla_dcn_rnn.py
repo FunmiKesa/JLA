@@ -676,7 +676,6 @@ class RNNForecast(nn.Module):
             future_length = forecast["future_length"]
             use_embedding = forecast["use_embedding"]
 
-            del heads["fct"]
 
             self.rnn = ForeCastRNN(
                 input_size,
@@ -689,10 +688,10 @@ class RNNForecast(nn.Module):
             self.forecast = forecast
             # heads["fct"] = hidden_size
 
-            # if use_embedding:
-            #     heads["fct"] = hidden_size
-            # else:
-            #     heads["fct"] = 1
+            if use_embedding:
+                heads["fct"] = hidden_size 
+            else:
+                del heads["fct"]
         self.heads = heads
         for head in self.heads:
             classes = self.heads[head]
@@ -748,7 +747,7 @@ class RNNForecast(nn.Module):
         for i in range(self.last_level - self.first_level):
             y.append(x[i].clone())
         self.ida_up(y, 0, len(y))
-        feat = y[-1]
+        # feat = y[-1]
 
         z = {}
         for head in self.heads:
@@ -756,8 +755,8 @@ class RNNForecast(nn.Module):
 
         if len(prev) > 0:
             f = None
-            batch, c, height, width = feat.size()
-            feat = feat.contiguous().view(batch, c, -1).permute(0,2,1).contiguous()
+            # batch, c, height, width = feat.size()
+            # feat = feat.contiguous().view(batch, c, -1).permute(0,2,1).contiguous()
 
             if "fct" in z:
                 f = z["fct"]
@@ -767,7 +766,7 @@ class RNNForecast(nn.Module):
                 f = f.permute(0, 2, 1).contiguous().view(-1, cat).contiguous()
             if len(prev.size()) > 3:
                 prev = prev.reshape(-1, prev.size(-2), prev.size(-1)).contiguous()
-            z["fct"] = self.rnn(prev, feat)
+            z["fct"] = self.rnn(prev, f)
 
         output = [z]
         return output

@@ -321,5 +321,7 @@ class IOUloss(nn.Module):
             loss = loss.mean()
         elif self.reduction == "sum":
             loss = loss.sum()
+        else:
+          return loss
 
         return max(loss, 0)

@@ -295,6 +295,7 @@ class JDETracker(object):
         self.tracked_stracks = []  # type: list[STrack]
         self.lost_stracks = []  # type: list[STrack]
         self.removed_stracks = []  # type: list[STrack]
+        self.forecast_hist = {}
 
         self.frame_id = 0
         self.det_thresh = opt.conf_thres
@@ -455,6 +456,7 @@ class JDETracker(object):
             pred_futures = None
             if len(selected_strack) > 0:
                 _, pred_futures, probs = output['fct']
+                # probs = F.softmax(probs, dim=2)
                 # print(probs)
                 # probs = probs.squeeze().contiguous().sigmoid_()
                 pred_futures = pred_futures.cpu().numpy()
@@ -605,6 +607,12 @@ class JDETracker(object):
                 det = forecasts[idet]
                 track.update(det, self.frame_id)
                 activated_starcks.append(track)
+
+                if self.frame_id not in self.forecast_hist:
+                    self.forecast_hist[self.frame_id] = []
+
+                self.forecast_hist[self.frame_id].append(track.track_id)
+
                 # else:
                 #     track.mark_occluded();
                 #     track.re_activate(det, self.frame_id, new_id=False)
@@ -702,7 +710,7 @@ def forecast_track_in_frame(track, img_size=()):
     forecast_index = track.forecast_index #* track.time_since_update
     track.forecast_index = 0
     # if track.track_id in [1, 21]:
-    print(track, track.forecasts_scores[forecast_index], forecast_index)
+    print(track, track.forecasts_scores)
     if forecast_index >= len(futures):
         return pred
 

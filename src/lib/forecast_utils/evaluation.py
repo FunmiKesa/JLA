@@ -16,7 +16,7 @@ import glob
 import motmetrics as mm
 mm.lap.default_solver = 'lap'
 
-def get_bboxes(gt_label_root, pred_length=30, gt_folder='future', pred_folder='pred', fixed_length=False):
+def get_bboxes(gt_label_root, pred_length=30, gt_folder='future2', pred_folder='pred', fixed_length=False):
     bboxes1 = []
     bboxes2 = []
     pred_label_root = gt_label_root.replace(gt_folder, pred_folder)
@@ -105,7 +105,7 @@ def get_bboxes(gt_label_root, pred_length=30, gt_folder='future', pred_folder='p
     return {smaller_folder: bboxes1, larger_folder: bboxes2, "filenames":info}
 
  
-def eval_seq(gt_label_root, pred_length=30, gt_folder='future', pred_folder='pred', fixed_length=True, return_mean=True):
+def eval_seq(gt_label_root, pred_length=30, gt_folder='future2', pred_folder='pred', fixed_length=True, return_mean=True):
     
     bboxes = get_bboxes(gt_label_root, pred_length, gt_folder, pred_folder, fixed_length)
     bboxes1, bboxes2 = bboxes[gt_folder], bboxes[pred_folder]
@@ -123,7 +123,7 @@ def eval_seq(gt_label_root, pred_length=30, gt_folder='future', pred_folder='pre
     return aiou, fiou, ade, fde
 
 
-def eval(label_root, pred_length=30, gt_folder='future', pred_folder='pred', filename=None):
+def eval(label_root, pred_length=30, gt_folder='future2', pred_folder='pred', filename=None):
     seqs = [s for s in os.listdir(label_root)]
 
     aious = []
