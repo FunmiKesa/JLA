@@ -3,7 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 
-from models.networks.forecast_rnn import ForeCastRNN
+from models.networks.forecast_rnn2 import ForeCastRNN
 
 import os
 import math

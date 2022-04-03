@@ -459,7 +459,7 @@ class JDETracker(object):
                 # probs = F.softmax(probs, dim=2)
                 # print(probs)
                 # probs = probs.squeeze().contiguous().sigmoid_()
-                pred_futures = pred_futures.cpu().numpy()
+                pred_futures = pred_futures.cpu().numpy()[..., :4]
                 # flip back
                 pasts_mask = np.flip(pasts_mask, 1)
                 mask = pasts_mask.max(axis=1)
