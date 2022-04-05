@@ -662,7 +662,7 @@ class JointDataset(LoadImagesAndLabels):  # for training
             if os.path.exists(forecast_past_path) and os.path.exists(
                 forecast_future_path
             ):
-                column_length = (self.past_length + 1) * 5 + 1
+                column_length = (self.past_length) * 5 + 1
                 pasts_data, pasts_data_mask = load_txt(
                     forecast_past_path, column_length, max_column=151
                 )
@@ -770,10 +770,8 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 futures_data = futures_data.reshape(-1, self.future_length, 6)
                 futures_data_mask = futures_data_mask.reshape(-1, self.future_length)
 
-                pasts_data = pasts_data.reshape(-1, self.past_length + 1, 6)
-                pasts_data_mask = pasts_data_mask.reshape(-1, self.past_length + 1)[
-                    :, 1:
-                ]
+                pasts_data = pasts_data.reshape(-1, self.past_length, 6)
+                pasts_data_mask = pasts_data_mask.reshape(-1, self.past_length)
 
                 # 2. remove objects below minimum past sequence length using the pasts_data_mask
                 sum_thresh = self.min_past_length
@@ -841,9 +839,9 @@ class JointDataset(LoadImagesAndLabels):  # for training
 
                 labels_change = np.diff(labels, axis=1)
 
-                labels = labels[:, 1:, :]
+                # labels = labels[:, 1:, :]
 
-                pasts[: labels_change.shape[0], :, 4:] = labels_change
+                pasts[: labels_change.shape[0], 1:, 4:] = labels_change
                 pasts[: labels_change.shape[0], :, :4] = labels
 
                 pasts_mask[: mask.shape[0], :] = mask
