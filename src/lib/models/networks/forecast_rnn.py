@@ -63,6 +63,12 @@ class DecoderRNN(nn.Module):
             input = self.fc_in(h_t)
             # decoded_inputs.insert(0, input)
             decoded_inputs += [input]
+            if self.use_embedding:
+                prob = self.prob(h_t + dla_features)
+            else:
+                prob = self.prob(h_t)
+            probs.append(prob)
+
         decoded_inputs = torch.stack(decoded_inputs, 1)
         result.append(decoded_inputs)
 

@@ -54,8 +54,8 @@ class BaseTrainer(object):
       if len(self.opt.gpus) > 1:
         model_with_loss = self.model_with_loss.module
       model_with_loss.eval()
-      # torch.cuda.empty_cache()
-    # torch.autograd.set_detect_anomaly(True)
+    # torch.cuda.empty_cache()
+    torch.autograd.set_detect_anomaly(True)
     opt = self.opt
     results = {}
     data_time, batch_time = AverageMeter(), AverageMeter()

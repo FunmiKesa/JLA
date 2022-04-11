@@ -30,11 +30,11 @@ class DecoderRNN(nn.Module):
         self.output_size = output_size
         self.use_embedding = use_embedding
         self.decoder1 = nn.GRUCell(self.num_hidden, self.num_hidden)
-        # self.decoder2 = nn.GRUCell(self.num_hidden, self.num_hidden)
-        self.fc_in = nn.Linear(self.num_hidden, self.input_size)
+        self.decoder2 = nn.GRUCell(self.num_hidden, self.num_hidden)
+        self.fc_in = nn.Linear(self.num_hidden, self.output_size)
         self.fc_out = nn.Linear(self.num_hidden, self.output_size)
         self.relu_context = nn.ReLU()
-        # self.relu_output = nn.ReLU()
+        self.relu_output = nn.ReLU()
         # self.relu_dla_features = nn.ReLU()
         self.context_encoder = nn.Linear(self.num_hidden, int(self.num_hidden))
         self.dla_encoder = nn.Linear(self.num_hidden // 2, int(self.num_hidden / 2))
@@ -60,47 +60,36 @@ class DecoderRNN(nn.Module):
         h_t = context
 
         # decode input and output
-        i = 0
-        while i < (past_length+ future_length):
-            h_t = self.decoder1(encoded_context, h_t)
-            if i < past_length:
-                input = self.fc_in(h_t) 
-                decoded_inputs += [input]
-            else:
-                input = self.fc_in(h_t)
-                outputs += [input]
-
-                if self.use_embedding:
-                    prob = self.prob(h_t + dla_features)
-                else:
-                    prob = self.prob(h_t)
-
-                probs.append(prob)
+        # i = 0
+        # while i < (past_length):
+        #     h_t = self.decoder1(encoded_context, h_t)
+        #     input = self.fc_in(h_t) 
+        #     decoded_inputs += [input]
             
-            i += 1
+        #     i += 1
 
         # generate input
-        # for i in range(past_length - 1, -1, -1):
-        #     h_t = self.decoder1(encoded_context, h_t)
-        #     input = self.fc_in(h_t)
-        #     # decoded_inputs.insert(0, input)
-        #     decoded_inputs += [input]
+        for i in range(past_length - 1, -1, -1):
+            h_t = self.decoder1(encoded_context, h_t)
+            input = self.fc_in(h_t)
+            decoded_inputs.insert(0, input)
+            # decoded_inputs += [input]
 
         decoded_inputs = torch.stack(decoded_inputs, 1)
         result.append(decoded_inputs)
 
-        # h_t = context
+        h_t = context
 
-        # # forecast
-        # for i in range(future_length):
-        #     h_t = self.decoder2(encoded_context, h_t)
-        #     output = self.fc_out(self.relu_output(h_t))
-        #     outputs += [output]
-        #     if self.use_embedding:
-        #         prob = self.prob(h_t + dla_features)
-        #     else:
-        #         prob = self.prob(h_t)
-        #     probs.append(prob)
+        # forecast
+        for i in range(future_length):
+            h_t = self.decoder2(encoded_context, h_t)
+            output = self.fc_out(self.relu_output(h_t))
+            outputs += [output]
+            if self.use_embedding:
+                prob = self.prob(encoded_context + h_t + dla_features)
+            else:
+                prob = self.prob(h_t)
+            probs.append(prob)
 
         outputs = torch.stack(outputs, 1)
         probs = torch.stack(probs, 1)
@@ -116,14 +105,17 @@ class DecoderRNN(nn.Module):
         
 
         return result
-
-
-class Cumsum(nn.Module):
-    def forward(self, last, pred):
+class ReverseCumsum(nn.Module):
+    def forward(self, x):
         # cumsum
-        cs = last + torch.cumsum(pred, dim=1)
+        cs = torch.sum(x, dim=1, keepdims=True) - torch.cumsum(x, dim=1)
         return cs
 
+class Cumsum(nn.Module):
+    def forward(self, x):
+        # cumsum
+        cs = torch.cumsum(x, dim=1)
+        return cs
 
 class ForeCastRNN(nn.Module):
     def __init__(
@@ -140,7 +132,8 @@ class ForeCastRNN(nn.Module):
             input_size, output_size, self.num_hidden, self.use_embedding
         )
 
-        # self.final = Cumsum()
+        self.future = Cumsum()
+        self.past = ReverseCumsum()
 
     def forward(self, prev_bboxes, features=None):
         context = self.encoder(prev_bboxes)
@@ -150,7 +143,8 @@ class ForeCastRNN(nn.Module):
             context, features, self.future_length, past_length=past_length
         )
 
-        # last = prev_bboxes[:, -1:, :4]
-        # output[1] = self.final(last, output[1])
+        last = prev_bboxes[:, -1:, :4]
+        output[1] = last + self.future(output[1])
+        output[0] = last - self.past(output[0])
 
         return output

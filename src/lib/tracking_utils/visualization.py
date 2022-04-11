@@ -63,18 +63,21 @@ def plot_tracking(image, tlwhs, obj_ids, scores=None, frame_id=0, fps=0., ids2=N
                     thickness=text_thickness)
         alt_y = not alt_y
     
-    # for i, tlwh in enumerate(gt_tlwhs):
-    #     x1, y1, w, h = tlwh
-    #     intbox = tuple(map(int, (x1, y1, x1 + w, y1 + h)))
-    #     obj_id = int(gt_ids[i])
-    #     id_text = '{}'.format(int(obj_id))
-    #     if ids2 is not None:
-    #         id_text = id_text + ', {}'.format(int(ids2[i]))
-    #     _line_thickness = 1 if obj_id <= 0 else line_thickness
-    #     color = (0, 255, 0)# get_color(abs(obj_id))
-    #     cv2.rectangle(im, intbox[0:2], intbox[2:4], color=color, thickness=line_thickness)
-    #     cv2.putText(im, id_text, (intbox[0], intbox[1] - 30), cv2.FONT_HERSHEY_PLAIN, text_scale, (0, 255, 0),
-    #                 thickness=text_thickness)
+    for i, tlwh in enumerate(gt_tlwhs):
+        x1, y1, w, h = tlwh
+        intbox = tuple(map(int, (x1, y1, x1 + w, y1 + h)))
+        obj_id = int(gt_ids[i])
+        id_text = '{}'.format(int(obj_id))
+        if ids2 is not None:
+            id_text = id_text + ', {}'.format(int(ids2[i]))
+        _line_thickness = 1 if obj_id <= 0 else line_thickness
+        color = (0, 255, 0)# get_color(abs(obj_id))
+        cv2.rectangle(im, intbox[0:2], intbox[2:4], color=color, thickness=line_thickness)
+        x = intbox[0] if alt_y else intbox[2] - 30
+        y  = intbox[1] - 20 if alt_y else intbox[3]+ 20
+        cx,cy = np.clip(intbox[0], 0, im_w - 1), np.clip(y, 0, im_h - 1)
+        cv2.putText(im, id_text, (cx, cy), cv2.FONT_HERSHEY_PLAIN, text_scale, (0, 255, 0),
+                    thickness=text_thickness)
         
     
     for i, tlwhs in enumerate(forecasts):
@@ -86,6 +89,11 @@ def plot_tracking(image, tlwhs, obj_ids, scores=None, frame_id=0, fps=0., ids2=N
         intbox = tuple(map(int, (cx - w/2, cy - h/2, cx + w/2, cy + h/2)))
         color = (255, 255,255) #get_color(abs(obj_id))
         cv2.rectangle(im, intbox[0:2], intbox[2:4], color=color, thickness=line_thickness)
+        id_text = '{}'.format(int(obj_id))
+        y  = intbox[1] - 30 if alt_y else intbox[3]+ 30
+        cx,cy = np.clip(intbox[0], 0, im_w - 1), np.clip(y, 0, im_h - 1)
+        cv2.putText(im, id_text, (cx, cy), cv2.FONT_HERSHEY_PLAIN, text_scale, color,
+                    thickness=text_thickness)
 
         # for j in range(0, len(tlwhs), 5):
         #     bbox_pred = tlwhs[j]

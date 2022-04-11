@@ -85,25 +85,35 @@ class MotLoss(torch.nn.Module):
 
                     pasts_mask = pasts_mask.view(batch_size * opt.K, -1).contiguous().float()
 
-                    pasts = pasts.view(batch_size * opt.K, past_length, -1).contiguous().float()
+                    pasts = pasts.view(batch_size * opt.K, past_length, -1).contiguous().float()[...,:4]
 
                     # pasts_mask= pasts_mask.type(torch.bool)
                     # pred_pasts =pred_pasts[...,:8][pasts_mask]
                     # pasts = pasts[...,:8][pasts_mask]
 
-                    pred_pasts = pred_pasts[...,:8] * pasts_mask[:,:, None]
+                    pred_pasts = pred_pasts * pasts_mask[:,:, None]
                     
                     pasts_loss += F.l1_loss(pred_pasts, pasts, reduction='sum')
 
                     if pasts_mask.sum() > 0:
-                        pasts_loss /= (pasts_mask.sum() * 8 )
-
-                        pasts_mask= pasts_mask.type(torch.bool)
-                        pred_pasts =pred_pasts[...,:8][pasts_mask]
-                        pasts = pasts[...,:8][pasts_mask]
+                        pasts_loss /= (pasts_mask.sum() * 4)
                         
-                        pasts_loss += self.iou_loss(pred_pasts, pasts)
-                        # pasts_loss /= (pasts_mask.sum())
+                        # prev_pred_pasts = (pred_pasts[..., :4] - pred_pasts[..., 4:])[:,1:, :]
+                        # prev_loss = F.l1_loss(prev_pred_pasts, pasts[:, :-1, :4], reduction='sum') / (pasts_mask[:,:-1].sum() * 4)
+
+                        # prev_loss = F.l1_loss(pred_pasts[...,:4], pasts[...,:4], reduction='sum') / (pasts_mask.sum() * 4)
+
+                        # pasts_loss += prev_loss
+
+                        pasts_mask = pasts_mask.type(torch.bool)
+                        pred_pasts_bbox = pred_pasts[pasts_mask]
+                        pasts_bbox = pasts[pasts_mask]
+                        
+                        pasts_loss += self.iou_loss(pred_pasts_bbox, pasts_bbox)
+
+                    # pasts_mask = pasts_mask.type(torch.float)
+                    # ploss = F.l1_loss(probs[:,:past_length], pasts_mask, reduction='mean')#.sum() / (futures_mask.sum() + 1e-10)
+                    # pasts_loss += ploss
 
                     pasts_loss /= opt.num_stacks
 
@@ -125,21 +135,21 @@ class MotLoss(torch.nn.Module):
                         futures_loss /= (futures_mask.sum() * 4)
 
                         futures_mask= futures_mask.type(torch.bool)
-                        pred_futures = pred_futures[...,:4][futures_mask]
-                        futures = futures[...,:4][futures_mask]
+                        pred_futures = pred_futures[futures_mask]
+                        futures = futures[futures_mask]
                         futures_loss += self.iou_loss(pred_futures, futures)
                         # futures_loss /= (futures_mask.sum())
 
                     # probs = probs[futures_mask]
 
-                    futures_mask = futures_mask.type(torch.float)
+                    futures_mask = futures_mask.type(torch.float32)
                     # probs = probs * futures_mask
                     # iou_loss = IOUloss()(pred_futures, futures)
 
                     # ploss = self.mask_loss(probs, futures_mask)
                     # ploss = F.binary_cross_entropy_with_logits(probs, futures_mask, reduction='none').sum() / (futures_mask.sum() + 1e-10)
                     # ploss = F.l1_loss(probs, futures_mask, reduction='none').sum() / (futures_mask.sum() + 1e-10)
-                    ploss = F.l1_loss(probs, futures_mask, reduction='mean')#.sum() / (futures_mask.sum() + 1e-10)
+                    ploss = F.l1_loss(probs.type(torch.float32), futures_mask, reduction='mean')#.sum() / (futures_mask.sum() + 1e-10)
                     
                     futures_loss += ploss
 
