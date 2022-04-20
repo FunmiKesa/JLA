@@ -159,15 +159,15 @@ class LoadImagesAndPasts:  # for inference
         # cv2.imwrite(img_path + '.letterbox.jpg', 255 * img.transpose((1, 2, 0))[:, :, ::-1])  # save letterbox image
 
         # load pasts data
-        pasts_data, p_mask = np.array([]), np.array([])
+        pasts_data, pasts_data_mask = np.array([]), np.array([])
         if self.past_length > 0:
             forecast_past_path = self.forecast_past_files[self.count]
             if os.path.exists(forecast_past_path):
                 column_length = (self.past_length + 1) * 4 + 1
-                pasts_data, p_mask = load_txt(
+                pasts_data, pasts_data_mask = load_txt(
                     forecast_past_path, column_length, max_column=121
                 )
-                pasts_data, p_mask = self.six_dim(pasts_data, p_mask)
+                pasts_data, pasts_data_mask = self.six_dim(pasts_data, pasts_data_mask)
 
                 labels = pasts_data.copy()
 
@@ -188,8 +188,10 @@ class LoadImagesAndPasts:  # for inference
                 pasts_data[:, 5] /= height
 
                 pasts_data = pasts_data.reshape(-1, self.past_length + 1, 6)
-                p_mask = p_mask.reshape(-1, self.past_length + 1, 4)[:, 1:, :]
-        return img_path, img, img0, pasts_data, p_mask
+                pasts_data_mask = pasts_data_mask.reshape(-1, self.past_length + 1, 4)[
+                    :, 1:, :
+                ]
+        return img_path, img, img0, pasts_data, pasts_data_mask
 
     def __getitem__(self, idx):
         idx = idx % self.nF
@@ -526,11 +528,19 @@ class JointDataset(LoadImagesAndLabels):  # for training
             self.past_length = self.forecast["past_length"]
             self.future_length = self.forecast["future_length"]
             self.fixed_length = self.forecast["fixed_length"]
+            self.min_past_length = (
+                self.past_length
+                if self.fixed_length
+                else self.forecast.get("min_past_length", 2)
+            )
+            self.min_future_length = (
+                self.future_length
+                if self.fixed_length
+                else self.forecast.get("min_future_length", 1)
+            )  # set min_future_length to 1 if we are not using a fixed length. This implies we can predict the current frame location at least.
             self.hidden_size = self.forecast["hidden_size"]
             self.input_size = self.forecast["input_size"]
             self.output_size = self.forecast["output_size"]
-            self.race = 0
-
             self.forecast_future_files = OrderedDict()
             self.forecast_past_files = OrderedDict()
 
@@ -609,7 +619,7 @@ class JointDataset(LoadImagesAndLabels):  # for training
         temp[:, :, 1] = inds[:, np.newaxis]
         temp = temp.reshape(-1, 6)
         data = temp
-        mask = mask.reshape(-1, 4)
+        mask = mask.reshape(-1, 4)[..., 1]  # numb_objs X sequence_length
         return data, mask
 
     def get_file_path(self, files_index):
@@ -639,33 +649,35 @@ class JointDataset(LoadImagesAndLabels):  # for training
             pasts = np.zeros(
                 (self.max_objs, self.past_length, self.input_size), dtype=np.float32
             )
-            futures_mask = np.zeros(
-                (self.max_objs, self.future_length, self.output_size), dtype=np.uint8
-            )
+            futures_mask = np.zeros((self.max_objs, self.future_length), dtype=np.uint8)
             futures_inds = np.zeros((self.max_objs), dtype=np.int64)
-            pasts_mask = np.zeros(
-                (self.max_objs, self.past_length, self.input_size), dtype=np.uint8
-            )
+            pasts_mask = np.zeros((self.max_objs, self.past_length), dtype=np.uint8)
             pasts_inds = np.zeros((self.max_objs), dtype=np.int64)
+
+            has_forecast_data = False
 
             if os.path.exists(forecast_past_path) and os.path.exists(
                 forecast_future_path
             ):
-                column_length = (self.past_length + 1) * 4 + 1
-                pasts_data, p_mask = load_txt(
+                column_length = (self.past_length) * 4 + 1
+                pasts_data, pasts_data_mask = load_txt(
                     forecast_past_path, column_length, max_column=121
                 )
-                pasts_data, p_mask = self.six_dim(pasts_data, p_mask)
+                pasts_data, pasts_data_mask = self.six_dim(pasts_data, pasts_data_mask)
 
                 # if self.fixed_length:
-                #     print(forecast_past_path, p_mask.shape,p_mask.sum())
+                #     print(forecast_past_path, pasts_data_mask.shape,pasts_data_mask.sum())
 
                 column_length = (self.future_length) * 4 + 1
-                futures_data, f_mask = load_txt(
+                futures_data, futures_data_mask = load_txt(
                     forecast_future_path, column_length, max_column=361
                 )
 
-                futures_data, f_mask = self.six_dim(futures_data, f_mask)
+                futures_data, futures_data_mask = self.six_dim(
+                    futures_data, futures_data_mask
+                )
+
+                has_forecast_data = True
 
         (
             imgs,
@@ -742,31 +754,65 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 bbox_xys[k] = bbox_xy
 
         if self.forecast:
-            if len(f_data):
+            if has_forecast_data:
+
+                # 1. set the processed data
+                futures_data_mask &= f_data_mask
                 futures_data[f_data_mask] = f_data
-                futures_data[f_data_mask == False] = 0
+                futures_data[~futures_data_mask] = 0
+
+                pasts_data_mask &= p_data_mask
+                pasts_data[p_data_mask] = p_data
+                pasts_data[~pasts_data_mask] = 0
 
                 futures_data = futures_data.reshape(-1, self.future_length, 6)
+                futures_data_mask = futures_data_mask.reshape(-1, self.future_length)
+
+                pasts_data = pasts_data.reshape(-1, self.past_length, 6)
+                pasts_data_mask = pasts_data_mask.reshape(-1, self.past_length)
+
+                # 2a. remove objects below minimum past sequence length using the pasts_data_mask
+                sum_thresh = self.min_past_length
+                mask = pasts_data_mask.sum(axis=1) >= sum_thresh
+                # pasts_data_mask &= mask[:, np.newaxis]
+                pasts_data_mask = pasts_data_mask[mask]
+                pasts_data = pasts_data[mask]
+
+                # 2b. remove future data with min future sequence length using the futures_data_mask
+                sum_thresh = self.min_future_length
+                mask = futures_data_mask.sum(axis=1) >= sum_thresh
+                # futures_data_mask &= mask[:, np.newaxis]
+                futures_data_mask = futures_data_mask[mask]
+                futures_data = futures_data[mask]
+
+                # 3. ensure that the past and future data align by removing non-intersecting data
+                mask = np.in1d(
+                    futures_data[:, 0, 1], pasts_data[:, 0, 1], assume_unique=True
+                )
+                # futures_data_mask &= mask[:, np.newaxis]
+                futures_data_mask = futures_data_mask[mask]
+                futures_data = futures_data[mask]
+
+                mask = np.in1d(
+                    pasts_data[:, 0, 1], futures_data[:, 0, 1], assume_unique=True
+                )
+                # pasts_data_mask &= mask[:, np.newaxis]
+                pasts_data_mask = pasts_data_mask[mask]
+                pasts_data = pasts_data[mask]
+
+                # 4. convert past and future data to the ouput size
                 labels = futures_data.copy()[..., 2:]
                 inds = futures_data[..., 0, 1]
                 labels[..., [0, 2]] *= output_w
                 labels[..., [1, 3]] *= output_h
 
                 futures[: labels.shape[0], ...] = labels
-                f_mask = f_mask.reshape(-1, self.future_length, 4)
-                futures_mask[: f_mask.shape[0], :] = f_mask
-                futures_inds[: f_mask.shape[0]] = inds
+                futures_mask[: futures_data_mask.shape[0], :] = futures_data_mask
+                futures_inds[: futures_data_mask.shape[0]] = inds
 
-                futures = futures * futures_mask
+                futures = futures * futures_mask[:, :, np.newaxis]
                 futures = futures.astype(np.float32)
                 futures_mask = futures_mask.astype(np.uint8)
-
-            if len(p_data):
-                pasts_data[p_data_mask] = p_data
-                pasts_data[p_data_mask == False] = 0
-
-                pasts_data = pasts_data.reshape(-1, self.past_length + 1, 6)
-                p_mask = p_mask.reshape(-1, self.past_length + 1, 4)[:, 1:, :]
 
                 labels = pasts_data.copy()[..., 2:]
                 inds = pasts_data[:, 0, 1]
@@ -775,20 +821,21 @@ class JointDataset(LoadImagesAndLabels):  # for training
 
                 # flip - oldest first
                 labels = np.flip(labels, 1)
-                mask = np.flip(p_mask, 1)
+                mask = np.flip(pasts_data_mask, 1)
 
-                labels_change = np.diff(labels, axis=1)
+                labels = labels * mask[:, :, None]
 
-                labels = labels[:, 1:, :]
+                labels_change = np.diff(labels, axis=1) * mask[:, :-1, None]
 
-                pasts[: labels_change.shape[0], :, 4:] = labels_change
+                # labels = labels[:, 1:, :]
+
+                pasts[: labels_change.shape[0], 1:, 4:8] = labels_change
                 pasts[: labels_change.shape[0], :, :4] = labels
 
-                pasts_mask[: mask.shape[0], :, :4] = mask
-                pasts_mask[: mask.shape[0], :, 4:] = mask
+                pasts_mask[: mask.shape[0], :] = mask
                 pasts_inds[: mask.shape[0]] = inds
 
-                pasts = pasts * pasts_mask
+                pasts = pasts * pasts_mask[:, :, np.newaxis]
                 pasts = pasts.astype(np.float32)
                 pasts_mask = pasts_mask.astype(np.uint8)
 
@@ -862,6 +909,16 @@ class JointDataset(LoadImagesAndLabels):  # for training
         # Load labels
         if os.path.isfile(label_path):
             labels0 = np.loadtxt(label_path, dtype=np.float32).reshape(-1, 6)
+            if self.forecast:
+                try:
+                    assert (
+                        len(labels0) == len(futures_data[:, 1]) // self.future_length
+                    ), f"Seems the future data {len(futures_data)} does not match the labels data {len(labels0)}."  # assert that the future data contains at least the current label
+                except Exception as ex:
+                    # print(
+                    # f"Seems the future data {len(futures_data) // self.future_length} does not match the labels data {len(labels0)}. {label_path}"
+                    # )
+                    pass
 
             # Normalized xywh to pixel xyxy format
             labels = labels0.copy()
@@ -870,7 +927,7 @@ class JointDataset(LoadImagesAndLabels):  # for training
             labels[:, 4] = ratio * w * (labels0[:, 2] + labels0[:, 4] / 2) + padw
             labels[:, 5] = ratio * h * (labels0[:, 3] + labels0[:, 5] / 2) + padh
 
-        if len(futures_data):
+        if len(futures_data) > 0:
             # Normalized xywh to pixel xyxy format
             labels_f[:, 2] = (
                 ratio * (futures_data[:, 2] - futures_data[:, 4] / 2) + padw
@@ -887,7 +944,7 @@ class JointDataset(LoadImagesAndLabels):  # for training
 
             labels_f_mask = np.ones(labels_f.shape[0]).astype(bool)
 
-        if len(pasts_data):
+        if len(pasts_data) > 0:
             # Normalized xywh to pixel xyxy format
             labels_p[:, 2] = ratio * (pasts_data[:, 2] - pasts_data[:, 4] / 2) + padw
             labels_p[:, 3] = ratio * (pasts_data[:, 3] - pasts_data[:, 5] / 2) + padh
@@ -902,10 +959,10 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 img, labels, degrees=(-5, 5), translate=(0.10, 0.10), scale=(0.50, 1.20)
             )
 
-            if len(futures_data):
+            if len(futures_data) > 0:
                 labels_f, labels_f_mask = warp_points(labels_f, M, a)
 
-            if len(pasts_data):
+            if len(pasts_data) > 0:
                 labels_p, labels_p_mask = warp_points(labels_p, M, a)
 
         if len(futures_data) > 0:
@@ -946,6 +1003,7 @@ class JointDataset(LoadImagesAndLabels):  # for training
             labels[:, 3] /= height
             labels[:, 4] /= width
             labels[:, 5] /= height
+
         if self.augment:
             # random left-right flip
             lr_flip = True
@@ -953,10 +1011,10 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 img = np.fliplr(img)
                 if nL > 0:
                     labels[:, 2] = 1 - labels[:, 2]
-                    if len(futures_data):
-                        labels_f[:, 2] = 1 - labels_f[:, 2]
-                    if len(pasts_data):
-                        labels_p[:, 2] = 1 - labels_p[:, 2]
+                if len(futures_data) > 0:
+                    labels_f[:, 2] = 1 - labels_f[:, 2]
+                if len(pasts_data) > 0:
+                    labels_p[:, 2] = 1 - labels_p[:, 2]
 
         img = np.ascontiguousarray(img[:, :, ::-1])  # BGR to RGB
 

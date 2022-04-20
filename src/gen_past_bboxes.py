@@ -50,6 +50,10 @@ def gen_past_files(seq_label_root, past_label_root, past_length=30, img_size=Non
         bbox[:, [2, 4]] *= seq_width
         bbox[:, [3, 5]] *= seq_height
         bbox[:, 0] = fid
+        bbox[:, 2] = bbox[:, 2].round(2)
+        bbox[:, 3] = bbox[:, 3].round(2)
+        bbox[:, 4] = bbox[:, 4].round(2)
+        bbox[:, 5] = bbox[:, 5].round(2)
         bboxes += [bbox]
 
     bboxes = np.concatenate(bboxes)
@@ -59,9 +63,11 @@ def gen_past_files(seq_label_root, past_label_root, past_length=30, img_size=Non
     # group by frame
     groups = df.groupby(["tid"])
 
+    fid_content = {}
     for tid, group in groups:
         if tid == -1:
             continue
+
         group = group.groupby("fid", as_index=False).mean()
         fids = group.fid.unique()
         group["cord"] = group.apply(
@@ -71,16 +77,24 @@ def gen_past_files(seq_label_root, past_label_root, past_length=30, img_size=Non
         # compute past
         group_reverse = group.iloc[::-1]
         fids_reverse = fids[::-1]
-        for i, c in chunker1(group_reverse, past_length, 0):
+        for i, c in chunker1(group_reverse, past_length, 1):
             # c = c.iloc[::-1]
             v = c.reset_index().pivot(index="tid", columns=["index"], values="cord")
             if v.empty:
                 continue
             label_str = f"{int(tid)} {' '.join(v.iloc[0][::-1])}\n"
+
             fid = int(fids_reverse[i])
-            label_fpath = label_file_paths[fid]
-            with open(label_fpath, "a+") as f:
-                f.write(label_str)
+            if fid not in fid_content:
+                fid_content[fid] = ""
+            fid_content[fid] += label_str
+
+    for fid in fid_content.keys():
+        label_fpath = label_file_paths[fid]
+        content = fid_content[fid]
+
+        with open(label_fpath, "w+") as f:
+            f.write(content)
 
 
 def main(d, past_label, past_length):
@@ -92,6 +106,7 @@ def main(d, past_label, past_length):
             seq_label = "img1"
             seq_root = f"data/{d}/images/train"
             label_root = f"data/{d}/labels_with_ids/train"
+
             seqs = os.listdir(label_root)
             for seq in seqs:
                 print(seq)
@@ -214,7 +229,9 @@ def print_progress(iteration, total, prefix="", suffix="", decimals=3, bar_lengt
 
 
 if __name__ == "__main__":
-    datasets = ["PRW", "Caltech", "MOT15", "MOT16", "MOT17", "MOT20"]
+    datasets = ["CityWalks", "PRW", "Caltech", "MOT15", "MOT16", "MOT17", "MOT20"]
+    datasets = ["MOT17"]
+
     past_label = "past"
     past_length = 30
     for d in datasets:
