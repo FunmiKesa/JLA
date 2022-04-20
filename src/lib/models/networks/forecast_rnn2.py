@@ -7,8 +7,8 @@ class EncoderRNN(nn.Module):
     def __init__(self, input_size, num_hidden):
         super(EncoderRNN, self).__init__()
         self.num_hidden = num_hidden
-        self.input_size = input_size
-        self.encoder1 = nn.GRUCell(input_size, self.num_hidden)
+        self.input_size = input_size +  1
+        self.encoder1 = nn.GRUCell(self.input_size, self.num_hidden)
 
     def forward(self, input):
         context = torch.zeros(
@@ -71,9 +71,14 @@ class DecoderRNN(nn.Module):
         # generate input
         for i in range(past_length - 1, -1, -1):
             h_t = self.decoder1(encoded_context, h_t)
-            input = self.fc_in(h_t)
+            input = self.fc_in(self.relu_output(h_t))
             decoded_inputs.insert(0, input)
             # decoded_inputs += [input]
+            if self.use_embedding:
+                prob = self.prob(h_t + dla_features)
+            else:
+                prob = self.prob(h_t)
+            probs.append(prob)
 
         decoded_inputs = torch.stack(decoded_inputs, 1)
         result.append(decoded_inputs)
@@ -86,7 +91,7 @@ class DecoderRNN(nn.Module):
             output = self.fc_out(self.relu_output(h_t))
             outputs += [output]
             if self.use_embedding:
-                prob = self.prob(encoded_context + h_t + dla_features)
+                prob = self.prob(h_t + dla_features)
             else:
                 prob = self.prob(h_t)
             probs.append(prob)
@@ -145,6 +150,8 @@ class ForeCastRNN(nn.Module):
 
         last = prev_bboxes[:, -1:, :4]
         output[1] = last + self.future(output[1])
-        output[0] = last - self.past(output[0])
+
+        if not self.training:
+            output[0] = last - self.past(output[0])
 
         return output

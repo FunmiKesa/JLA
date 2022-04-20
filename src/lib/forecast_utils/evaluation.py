@@ -173,6 +173,9 @@ def eval(label_root, pred_length=30, gt_folder='future2', pred_folder='pred', fi
 
 
 def save_result(filename, result, index, columns):
+    if len(result) == 0:
+        return
+        
     result = np.array(result).T
     df = pd.DataFrame(result, index=index, columns=columns)
     df.loc['Mean'] = df.mean()

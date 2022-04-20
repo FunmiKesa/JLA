@@ -46,8 +46,7 @@ def main(opt):
     print('Creating model...')
     model = create_model(opt.arch, opt.heads, opt.head_conv)
 
-    # save_forecast_model("../models/jla.pth", "../models/forecast_jla.pth")
-    
+    # save_forecast_model("../exp/mot/emb_size3/model_30.pth", "../models/forecast_emb_size3.pth")
     optimizer = torch.optim.Adam(model.parameters(), opt.lr)
     start_epoch = 0
     print( opt.load_model)
@@ -73,7 +72,7 @@ def main(opt):
         model, optimizer, start_epoch = load_model(
             model, opt.load_model, trainer.optimizer, opt.resume, opt.lr, opt.lr_step)
 
-    # model = load_model(model, "../models/forecast_jla.pth")
+    # model = load_model(model, "../models/forecast_emb_size3.pth")
 
     best = 1e10
     for epoch in range(start_epoch + 1, opt.num_epochs + 1):

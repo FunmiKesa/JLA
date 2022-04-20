@@ -647,10 +647,10 @@ class JointDataset(LoadImagesAndLabels):  # for training
             forecast_past_path = self.forecast_past_files[ds][files_index - start_index]
 
             futures = np.zeros(
-                (self.max_objs, self.future_length, self.output_size), dtype=np.float32
+                (self.max_objs, self.future_length, self.output_size + 1), dtype=np.float32
             )
             pasts = np.zeros(
-                (self.max_objs, self.past_length, self.input_size), dtype=np.float32
+                (self.max_objs, self.past_length, self.input_size + 1), dtype=np.float32
             )
             futures_mask = np.zeros((self.max_objs, self.future_length), dtype=np.uint8)
             futures_inds = np.zeros((self.max_objs), dtype=np.int64)
@@ -788,10 +788,17 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 futures_data = futures_data[mask]
 
                 # TODO: Add frame difference to past and future data
-                # futures_data_fids = futures_data.copy()[..., 0]
-                # futures_data_fids -= futures_data_fids.min()
+                pasts_data_fids = pasts_data.copy()[..., 0]
+                pasts_data_fids -= (pasts_data_fids[..., :1] +  1)
+                pasts_data_fids = np.abs(pasts_data_fids) / self.past_length 
+
+                futures_data_fids = futures_data.copy()[..., 0]
+                futures_data_fids -= (futures_data_fids[..., :1] -  1)
+                futures_data_fids = futures_data_fids / self.future_length
+
+                # futures_data_fids -= futures_data[..., 0].min(1)
                 # futures_data_fids = futures_data_fids.reshape(
-                #     -1, self.future_length
+                    # -1, self.future_length
                 # ).astype(int)
 
 
@@ -803,6 +810,7 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 # futures_data_mask &= mask[:, np.newaxis]
                 futures_data_mask = futures_data_mask[mask]
                 futures_data = futures_data[mask]
+                futures_data_fids = futures_data_fids[mask]
 
                 mask = np.in1d(
                     pasts_data[:, 0, 1], futures_data[:, 0, 1], assume_unique=True
@@ -810,6 +818,7 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 # pasts_data_mask &= mask[:, np.newaxis]
                 pasts_data_mask = pasts_data_mask[mask]
                 pasts_data = pasts_data[mask]
+                pasts_data_fids = pasts_data_fids[mask]
 
                 # assert (pasts_data[:, 0, 1] == futures_data[:, 0, 1]).all(), "Seems the indices for past and future data do not align."
 
@@ -819,7 +828,8 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 labels[..., [0, 2]] *= output_w
                 labels[..., [1, 3]] *= output_h
 
-                futures[: labels.shape[0], ...] = labels
+                futures[: labels.shape[0],:, :4] = labels
+                futures[: futures_data_fids.shape[0],:, -1] = futures_data_fids
 
                 futures_mask[: futures_data_mask.shape[0], :] = futures_data_mask
                 futures_inds[: futures_data_mask.shape[0]] = inds
@@ -837,12 +847,15 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 labels = np.flip(labels, 1)
                 mask = np.flip(pasts_data_mask, 1)
 
-                labels_change = np.diff(labels, axis=1)
+                labels = labels * mask[:,:, None]
+
+                labels_change = np.diff(labels, axis=1) * mask[:, :-1, None]
 
                 # labels = labels[:, 1:, :]
 
-                pasts[: labels_change.shape[0], 1:, 4:] = labels_change
+                pasts[: labels_change.shape[0], 1:, 4:8] = labels_change
                 pasts[: labels_change.shape[0], :, :4] = labels
+                pasts[: pasts_data_fids.shape[0], :, -1] = np.flip(pasts_data_fids, 1)
 
                 pasts_mask[: mask.shape[0], :] = mask
                 pasts_inds[: mask.shape[0]] = inds
@@ -850,6 +863,12 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 pasts = pasts * pasts_mask[:, :, np.newaxis]
                 pasts = pasts.astype(np.float32)
                 pasts_mask = pasts_mask.astype(np.uint8)
+
+                # pasts[..., -1] = pasts_mask
+                # futures[..., -1] = futures_mask
+
+                # pasts[..., -1] = np.flip(pasts_data_fids, 1)
+                # futures[..., -1] = futures_data_fids
 
             ret = {
                 "input": imgs,

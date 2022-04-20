@@ -1,5 +1,5 @@
 cd src
-EXP_ID=${1:-emb_size2}
+EXP_ID=${1:-emb_size8}
 ARCH=${2:-rnnforecast_34}
 DESC=${3:-experimenting on half mot17}
 
@@ -16,6 +16,7 @@ DESC=${3:-experimenting on half mot17}
 # --gpus '0,1' \
 # --past_length '10' \
 # --future_length '60' \
+# --use_embedding \
 # --save_all \
 # --multiprocessing_distributed \
 # --dist-url tcp://127.0.0.1:55062 \
@@ -25,6 +26,6 @@ DESC=${3:-experimenting on half mot17}
 
 
 
-python track_half.py mot --load_model "../exp/mot/$EXP_ID/model_30.pth" --conf_thres 0.4 --val_mot17 --exp_id "$EXP_ID" --arch "$ARCH" --forecast --no_kf --past_length 10 --future_length 2
+python track_half.py mot --load_model "../exp/mot/$EXP_ID/model_30.pth" --conf_thres 0.4 --val_mot17 --exp_id "$EXP_ID" --arch "$ARCH"  --past_length 10 --future_length 2 --forecast --no_kf --use_embedding >> "$EXP_ID 2.txt"
 
 # cd ..

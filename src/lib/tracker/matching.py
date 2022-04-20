@@ -158,6 +158,8 @@ def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.75, max_length=10):
     for row, track in enumerate(tracks):
         # d = dists[row]
         d = iou_distance(track.forecasts[:1], dets)[0]
+        lambda_ = 1 - (0.3  * track.forecasts_scores) - 0.2
+        print(track,track.forecasts_scores, "lambda_", lambda_)
         # if (len(track.forecasts) > 0):
         # c=max_length+track.time_since_update+track.forecast_index
         # forecasts = track.forecasts[:c]

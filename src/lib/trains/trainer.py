@@ -208,8 +208,8 @@ class Trainer:
         self.lr_scheduler = self.exp.get_lr_scheduler(
             self.exp.basic_lr_per_img * self.opts.batch_size, self.max_iter
         )
-        if self.opts.occupy:
-            occupy_mem(self.local_rank)
+        # if self.opts.occupy:
+            # occupy_mem(self.local_rank)
 
         if self.is_distributed:
             model = DDP(model, device_ids=[

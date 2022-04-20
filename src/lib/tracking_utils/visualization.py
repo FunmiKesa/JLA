@@ -53,6 +53,8 @@ def plot_tracking(image, tlwhs, obj_ids, scores=None, frame_id=0, fps=0., ids2=N
             id_text = id_text + ', {}'.format(int(ids2[i]))
         if scores is not None:
             id_text = id_text + ' {:.2f}'.format(scores[i])
+            # if scores[i] > 0.4:
+                # continue
         _line_thickness = 1 if obj_id <= 0 else line_thickness
         color = get_color(abs(obj_id))
         # color = (255, 255, 255)# get_color(abs(obj_id))

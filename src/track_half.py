@@ -13,6 +13,8 @@ import numpy as np
 import torch
 
 from tracker.multitracker import JDETracker
+# from tracker.bytetrackerplus import BYTETracker as JDETracker
+# from tracker.bytetracker import BYTETracker as JDETracker
 from tracking_utils import visualization as vis
 from tracking_utils.log import logger
 from tracking_utils.timer import Timer
@@ -84,11 +86,13 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
         # run tracking
         timer.tic()
         blob = torch.from_numpy(img).cuda().unsqueeze(0)
-        online_targets = tracker.update(blob, img0)
+        online_targets, extra = tracker.update(blob, img0)
         online_tlwhs = []
         online_ids = []
         online_scores = []
         online_forecasts = []
+
+       
         for t in online_targets:
             tlwh = t.tlwh
             tid = t.track_id
@@ -97,23 +101,37 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
                 online_tlwhs.append(tlwh)
                 online_ids.append(tid)
                 online_scores.append(t.score)
-                if t.tracklet_len > 0 and len(t.forecasts):
+                if opt.forecast and t.tracklet_len > 0 and len(t.forecasts):
                     online_forecasts.append(
                         np.array([tid] + list(t.forecasts_xywh.reshape(-1))))
         timer.toc()
 
-        forecast_hist.update(tracker.forecast_hist)
+        try:
+            forecast_hist.update(tracker.forecast_hist)
+        except:
+            pass
 
         # save results
         results.append((frame_id + 1, online_tlwhs, online_ids))
         if len(online_forecasts):
             forecast_results.append((frame_id + 1, online_forecasts))
         #results.append((frame_id + 1, online_tlwhs, online_ids, online_scores))
+        
+
         if show_image or save_dir is not None:
             gt_objs = evaluator.gt_frame_dict.get(frame_id+1, [])
             gt_tlwhs, gt_ids = unzip_objs(gt_objs)[:2]
             online_im = vis.plot_tracking(img0, online_tlwhs, online_ids, frame_id=frame_id,scores=online_scores,
                                           fps=1. / timer.average_time, gt_tlwhs=gt_tlwhs, gt_ids=gt_ids, forecasts=online_forecasts)
+
+            if extra:
+                # extra = [np.array([t.track_id] + list(t.tlwh)) for t in extra]
+                extra_tlwhs = [list(t.tlwh) for t in extra]
+                extra_ids = [0 for _ in range(len(extra))]
+                extra_scores = [t.score for t in extra]
+                online_im = vis.plot_tracking(online_im, extra_tlwhs, extra_ids, frame_id=frame_id,scores=extra_scores,
+                                            fps=1. / timer.average_time)
+
         if show_image:
             os.environ['DISPLAY'] = 'user-MS-7883:11.0'
             cv2.namedWindow("online_im",cv2.WINDOW_NORMAL)
@@ -145,6 +163,8 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
     accs = []
     n_frame = 0
     timer_avgs, timer_calls = [], []
+    # opt.forecast = False
+
     if opt.forecast:
         aious = []
         fious = []
@@ -185,6 +205,7 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
 
         all, all_idx, part, part_idx = analyze(acc, forecast_hist)
         mkdirs("output")
+        print(seq, part_idx)
         visualize(all, part, keys=["MATCH", "FP"], filename=f"output/{seq}.jpg")
         
         # summary.to_csv(os.path.join(result_root, 'summary_{}.csv'.format(exp_name)))
@@ -194,18 +215,18 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
             future_label_root = osp.join(opt.forecast_root, seq, 'img1')
 
             from forecast_utils import evaluation
-            aiou, fiou, ade, fde = evaluation.eval_seq(future_label_root, pred_length=opt.future_length, pred_folder= f"pred_{exp_name}", fixed_length=True)
-            aious.append(aiou)
-            fious.append(fiou)
-            ades.append(ade)
-            fdes.append(fde)
+            # aiou, fiou, ade, fde = evaluation.eval_seq(future_label_root, pred_length=opt.future_length, pred_folder= f"pred_{exp_name}", fixed_length=True)
+            # aious.append(aiou)
+            # fious.append(fiou)
+            # ades.append(ade)
+            # fdes.append(fde)
 
-            logger.info('\n')
-            logger.info(seq)
-            logger.info('AIOU: ' + str(round(aiou, 1)))
-            logger.info('FIOU: ' + str(round(fiou, 1)))
-            logger.info('ADE:  ' + str(round(ade, 1)))
-            logger.info('FDE:  ' + str(round(fde, 1)))
+            # logger.info('\n')
+            # logger.info(seq)
+            # logger.info('AIOU: ' + str(round(aiou, 1)))
+            # logger.info('FIOU: ' + str(round(fiou, 1)))
+            # logger.info('ADE:  ' + str(round(ade, 1)))
+            # logger.info('FDE:  ' + str(round(fde, 1)))
 
 
             # filename = os.path.join(
