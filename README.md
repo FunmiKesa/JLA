@@ -42,6 +42,11 @@ python gen_future_bboxes.py
 ## Training and Tracking
 * Download the training data into data folder or soft link your root data directory to the data folder.
 * Generate the forecast labels.
+
+* To train on half Mot17 datasets and evaluate the performance, run:
+```
+sh experiments/mot17_half_ft_ch.sh
+```
 * To train on mix datasets (crowdhuman pre-trained model) and evaluate the performance, run:
 ```
 sh experiments/mix_ft_ch_jla.sh
