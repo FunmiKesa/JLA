@@ -56,6 +56,10 @@ def gen_future_files(
         bbox[:, [2, 4]] *= seq_width
         bbox[:, [3, 5]] *= seq_height
         bbox[:, 0] = fid
+        bbox[:, 2] = bbox[:, 2].round(2)
+        bbox[:, 3] = bbox[:, 3].round(2)
+        bbox[:, 4] = bbox[:, 4].round(2)
+        bbox[:, 5] = bbox[:, 5].round(2)
         bboxes += [bbox]
 
     bboxes = np.concatenate(bboxes)
@@ -65,6 +69,7 @@ def gen_future_files(
     # group by frame
     groups = df.groupby(["tid"])
 
+    fid_content = {}
     for tid, group in groups:
         # print(tid)
         if tid == -1:
@@ -83,9 +88,16 @@ def gen_future_files(
             label_str = f"{int(tid)} {' '.join(v.iloc[0])}\n"
 
             fid = int(fids[i])
-            label_fpath = label_file_paths[fid]
-            with open(label_fpath, "a+") as f:
-                f.write(label_str)
+            if fid not in fid_content:
+                fid_content[fid] = ""
+            fid_content[fid] += label_str
+
+    for fid in label_file_paths.keys():
+        label_fpath = label_file_paths[fid]
+        content = fid_content[fid]
+
+        with open(label_fpath, "w") as f:
+            f.write(content)
 
 
 def main(d, future_label, future_length):
@@ -217,6 +229,7 @@ def print_progress(iteration, total, prefix="", suffix="", decimals=3, bar_lengt
 
 if __name__ == "__main__":
     datasets = [
+        "CityWalks",
         "PRW",
         "Caltech",
         "CityWalks",
@@ -225,6 +238,7 @@ if __name__ == "__main__":
         "MOT17",
         "MOT20",
     ]
+    datasets = ["MOT17"]
     future_label = "future"
     future_length = 60
 

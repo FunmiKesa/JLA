@@ -5,7 +5,6 @@ from __future__ import print_function
 import _init_paths
 
 import os
-import subprocess
 
 import json
 import torch
@@ -13,62 +12,17 @@ import torch.utils.data
 from torchvision.transforms import transforms as T
 from opts import opts
 from models.model import create_model, load_model, save_model
+from logger import Logger
 from datasets.dataset_factory import get_dataset
+from tracking_utils.utils import init_seeds
 from trains.train_factory import train_factory
 
-import torch.distributed as dist
-import torch.multiprocessing as mp
-
-from logger import Logger
-
-
-def main():
-    opt = opts().parse()
-    print(opt)
-    # log = Logger(opt)
-    torch.manual_seed(opt.seed)
+def main(opt):
+    # torch.manual_seed(opt.seed)
+    init_seeds(opt.seed)
     torch.backends.cudnn.benchmark = not opt.not_cuda_benchmark and not opt.test
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = opt.gpus_str
-    # os.environ['NCCL_DEBUG'] ='INFO'
-    opt.device = torch.device('cuda' if opt.gpus[0] >= 0 else 'cpu')
-
-    opt.distributed = opt.world_size > 1 or opt.multiprocessing_distributed
-
-    ngpus_per_node = len(opt.gpus)  # torch.cuda.device_count()
-    if opt.multiprocessing_distributed:
-        # Since we have ngpus_per_node processes per node, the total world_size
-        # needs to be adjusted accordingly
-        opt.world_size = ngpus_per_node * opt.world_size
-        # Use torch.multiprocessing.spawn to launch distributed processes: the
-        # main_worker process function
-        mp.spawn(main_worker, nprocs=ngpus_per_node,
-                 args=(ngpus_per_node, opt))
-    else:
-        # Simply call main_worker function
-
-        main_worker(opt.gpus, ngpus_per_node, opt)
-
-
-def main_worker(gpu, ngpus_per_node, opt):
-    opt.gpu = gpu
-    log = Logger(opt)
-
-    if opt.gpu is not None:
-        print("Use GPU: {} for training".format(opt.gpu))
-
-    if opt.distributed:
-        opt.gpus = [gpu]
-
-        if opt.dist_url == "env://" and opt.rank == -1:
-            opt.rank = int(os.environ["RANK"])
-        if opt.multiprocessing_distributed:
-            # For multiprocessing distributed training, rank needs to be the
-            # global rank among all the processes
-            opt.rank = opt.rank * ngpus_per_node + gpu
-        dist.init_process_group(backend=opt.dist_backend, init_method=opt.dist_url,
-                                world_size=opt.world_size, rank=opt.rank)
-
+    print('Setting up data...')
     Dataset = get_dataset(opt.dataset, opt.task)
     f = open(opt.data_cfg)
     data_config = json.load(f)
@@ -78,56 +32,30 @@ def main_worker(gpu, ngpus_per_node, opt):
     transforms = T.Compose([T.ToTensor()])
     dataset = Dataset(opt, dataset_root, trainset_paths,
                       (1088, 608), augment=True, transforms=transforms)
-
     opt = opts().update_dataset_info_and_set_heads(opt, dataset)
+    print(opt)
+
+    logger = Logger(opt)
+
+    os.environ['CUDA_VISIBLE_DEVICES'] = opt.gpus_str
+    opt.device = torch.device('cuda' if opt.gpus[0] >= 0 else 'cpu')
 
     print('Creating model...')
     model = create_model(opt.arch, opt.heads, opt.head_conv)
+
     optimizer = torch.optim.Adam(model.parameters(), opt.lr)
     start_epoch = 0
-
-    if not torch.cuda.is_available():
-        print('using CPU, this will be slow')
-    elif opt.distributed:
-        # For multiprocessing distributed, DistributedDataParallel constructor
-        # should always set the single device scope, otherwise,
-        # DistributedDataParallel will use all available devices.
-        if opt.gpu is not None:
-            torch.cuda.set_device(opt.gpu)
-            # model.cuda(opt.gpu)
-            # When using a single GPU per process and per
-            # DistributedDataParallel, we need to divide the batch size
-            # ourselves based on the total number of GPUs we have
-            opt.batch_size = int(opt.batch_size / ngpus_per_node)
-            opt.num_workers = int(
-                (opt.num_workers + ngpus_per_node - 1) / ngpus_per_node)
-            # model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[opt.gpu], find_unused_parameters=True)
-        else:
-            model.cuda()
-            # DistributedDataParallel will divide and allocate batch_size to all
-            # available GPUs if device_ids are not set
-            # model = torch.nn.parallel.DistributedDataParallel(model)
-    # elif opt.gpu is not None:
-    #     torch.cuda.set_device(opt.gpu)
-    #     model = model.cuda(opt.gpu)
-    # else:
-    #     # DataParallel will divide and allocate batch_size to all available GPUs
-    #     if opt.arch.startswith('alexnet') or opt.arch.startswith('vgg'):
-    #         model.features = torch.nn.DataParallel(model.features)
-    #         model.cuda()
-    #     else:
-    #         model = torch.nn.DataParallel(model).cuda()
+    print( opt.load_model)
 
     # Get dataloader
-
-    if opt.distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(
-            dataset)
-    else:
-        train_sampler = None
-
     train_loader = torch.utils.data.DataLoader(
-        dataset, batch_size=opt.batch_size, shuffle=(train_sampler is None), num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler, drop_last=True)
+        dataset,
+        batch_size=opt.batch_size,
+        shuffle=True,
+        num_workers=opt.num_workers,
+        pin_memory=True,
+        drop_last=True
+    )
 
     print('Starting training...')
     Trainer = train_factory[opt.task]
@@ -139,52 +67,33 @@ def main_worker(gpu, ngpus_per_node, opt):
             model, opt.load_model, trainer.optimizer, opt.resume, opt.lr, opt.lr_step)
 
     for epoch in range(start_epoch + 1, opt.num_epochs + 1):
-        if opt.distributed:
-            # set this to a larger seed
-            train_sampler.set_epoch(epoch * opt.seed)
         mark = epoch if opt.save_all else 'last'
         log_dict_train, _ = trainer.train(epoch, train_loader)
-        log.write('epoch: {} |'.format(epoch))
+        logger.write('epoch: {} |'.format(epoch))
         for k, v in log_dict_train.items():
-            log.scalar_summary('train_{}'.format(k), v, epoch)
-            log.write('{} {:8f} | '.format(k, v))
+            logger.scalar_summary('train_{}'.format(k), v, epoch)
+            logger.write('{} {:8f} | '.format(k, v))
 
-        suffix = 'last'
         if opt.val_intervals > 0 and epoch % opt.val_intervals == 0:
-            # save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(mark)),
-            #            epoch, model, optimizer)
-            suffix = mark
-        if not opt.multiprocessing_distributed or (opt.multiprocessing_distributed and opt.rank % ngpus_per_node == 0):
-            save_model(os.path.join(opt.save_dir, f'model_{suffix}.pth'),
+            save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(mark)),
                        epoch, model, optimizer)
-        log.write('\n')
+        else:
+            save_model(os.path.join(opt.save_dir, 'model_last.pth'),
+                       epoch, model, optimizer)
+        logger.write('\n')
         if epoch in opt.lr_step:
-            if not opt.multiprocessing_distributed or (opt.multiprocessing_distributed and opt.rank % ngpus_per_node == 0):
-                save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(epoch)),
-                           epoch, model, optimizer)
+            save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(epoch)),
+                       epoch, model, optimizer)
             lr = opt.lr * (0.1 ** (opt.lr_step.index(epoch) + 1))
             print('Drop LR to', lr)
             for param_group in optimizer.param_groups:
                 param_group['lr'] = lr
-
-            # save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(epoch)),
-                #    epoch, model, optimizer)
-        # if epoch % 5 == 0:
-        #     if not opt.multiprocessing_distributed or (opt.multiprocessing_distributed and opt.rank % ngpus_per_node == 0):
-        #         cmd = ["python", "./track.py",
-        #                "mot",
-        #                "--arch", "rnnforecast_34",
-        #                "--exp_id", f"val_{epoch}",
-        #                "--load_model", os.path.join(opt.save_dir,
-        #                                             f'model_last.pth'),
-        #                "--conf_thres", "0.4",
-        #                "--val_mot17",
-        #                "--forecast",
-        #                "--use_embedding"
-        #                ]
-        #         subprocess.run(cmd)
-    log.close()
+        if epoch % 5 == 0 or epoch >= 25:
+            save_model(os.path.join(opt.save_dir, 'model_{}.pth'.format(epoch)),
+                       epoch, model, optimizer)
+    logger.close()
 
 
 if __name__ == '__main__':
-    main()
+    opt = opts().parse()
+    main(opt)
