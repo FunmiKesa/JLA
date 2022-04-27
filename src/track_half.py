@@ -30,9 +30,11 @@ def write_results_forecasts(dir, results):
     mkdirs(dir)
     for frame_id, forecasts in results:
         filename = os.path.join(dir, '{:06d}.txt'.format(frame_id))
-        forecasts = np.array(forecasts)
-        fmt = fmt = '%d '+'%f ' * (forecasts.shape[-1] - 1)
-        np.savetxt(filename, forecasts, fmt=fmt)
+        with open(filename, "w") as f:
+            f.write(forecasts)
+        # forecasts = np.array(forecasts)
+        # fmt = fmt = '%d '+'%f ' * (forecasts.shape[-1] - 1)
+        # np.savetxt(filename, forecasts, fmt=fmt)
     logger.info('save forecast results to {}'.format(dir))
 
 def write_results(filename, results, data_type):
@@ -88,6 +90,7 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
         online_ids = []
         online_scores = []
         online_forecasts = []
+        online_forecasts_str = ""
         for t in online_targets:
             tlwh = t.tlwh
             tid = t.track_id
@@ -97,13 +100,14 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
                 online_ids.append(tid)
                 online_scores.append(t.score)
                 if t.tracklet_len > 0 and len(t.forecasts):
+                    online_forecasts_str += f"{tid} {'  '.join(list(t.forecasts_xywh.reshape(-1).round(2).astype(str)))}\n"
                     online_forecasts.append(
                         np.array([tid] + list(t.forecasts_xywh.reshape(-1))))
         timer.toc()
         # save results
         results.append((frame_id + 1, online_tlwhs, online_ids))
         if len(online_forecasts):
-            forecast_results.append((frame_id + 1, online_forecasts))
+            forecast_results.append((frame_id + 1, online_forecasts_str))
         #results.append((frame_id + 1, online_tlwhs, online_ids, online_scores))
         if show_image or save_dir is not None:
             gt_objs = evaluator.gt_frame_dict.get(frame_id+1, [])
@@ -184,19 +188,19 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
             logger.info('Evaluate seq (forecast): {}'.format(seq))
             future_label_root = osp.join(opt.forecast_root, seq, 'img1')
 
-            from forecast_utils import evaluation
-            aiou, fiou, ade, fde = evaluation.eval_seq(future_label_root, pred_length=opt.future_length, pred_folder= f"pred_{exp_name}", fixed_length=True)
-            aious.append(aiou)
-            fious.append(fiou)
-            ades.append(ade)
-            fdes.append(fde)
+            # from forecast_utils import evaluation
+            # aiou, fiou, ade, fde = evaluation.eval_seq(future_label_root, pred_length=opt.future_length, pred_folder= f"pred_{exp_name}", fixed_length=True)
+            # aious.append(aiou)
+            # fious.append(fiou)
+            # ades.append(ade)
+            # fdes.append(fde)
 
-            logger.info('\n')
-            logger.info(seq)
-            logger.info('AIOU: ' + str(round(aiou, 1)))
-            logger.info('FIOU: ' + str(round(fiou, 1)))
-            logger.info('ADE:  ' + str(round(ade, 1)))
-            logger.info('FDE:  ' + str(round(fde, 1)))
+            # logger.info('\n')
+            # logger.info(seq)
+            # logger.info('AIOU: ' + str(round(aiou, 1)))
+            # logger.info('FIOU: ' + str(round(fiou, 1)))
+            # logger.info('ADE:  ' + str(round(ade, 1)))
+            # logger.info('FDE:  ' + str(round(fde, 1)))
 
 
             # filename = os.path.join(
@@ -240,7 +244,7 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
         filename = os.path.join(
             result_root, 'forecast_{}.csv'.format(exp_name))
 
-        evaluation.save_result(filename, [aious, fious, ades, fdes], seqs, ["aiou", "fiou", "ade", "fde"])
+        # evaluation.save_result(filename, [aious, fious, ades, fdes], seqs, ["aiou", "fiou", "ade", "fde"])
 
 
 
@@ -305,7 +309,8 @@ if __name__ == '__main__':
         #seqs_str = '''MOT17-07-SDP MOT17-08-SDP'''
         data_root = os.path.join(opt.data_dir, 'MOT17/images/test')
     if opt.val_mot17:
-        seqs_str = '''MOT17-02-SDP
+        seqs_str = '''
+                      MOT17-02-SDP
                       MOT17-04-SDP
                       MOT17-05-SDP
                       MOT17-09-SDP
@@ -344,6 +349,7 @@ if __name__ == '__main__':
                       '''
         data_root = os.path.join(opt.data_dir, 'MOT20/images/test')
     seqs = [seq.strip() for seq in seqs_str.split()]
+    # seqs = ["MOT17-13-SDP"]
 
     if opt.forecast:
         opt.forecast_root = data_root.replace('images', 'future')
@@ -354,5 +360,6 @@ if __name__ == '__main__':
          seqs=seqs,
          exp_name=opt.exp_id,
          show_image=False,
+        #  save_images=True,
          save_images=False,
          save_videos=False)

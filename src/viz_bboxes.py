@@ -294,31 +294,27 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
         bboxes = evaluation.get_bboxes(future_label_root, pred_folder=pred_folder, fixed_length=opt.fixed_length, pred_length=opt.future_length)
         bboxes1, bboxes2, filenames= bboxes[gt_folder], bboxes[pred_folder], bboxes['filenames']
 
-        pred_fiou = np.array(calc_fiou(bboxes1, bboxes2, False))
+        gt_ids, pred_ids = bboxes["ids"][gt_folder], bboxes["ids"][pred_folder]
 
-        if GOOD:
-            ordered = np.argsort(pred_fiou)[::-1]
-            perf_type = "good"
-        else:
-            ordered = np.argsort(pred_fiou)
-            perf_type = "bad"
+        obj_id = 4
+        selected = pred_ids == obj_id
 
-        gt_bboxes = bboxes1[ordered[:LENGTH]].copy()
-        pred_bboxes = bboxes2[ordered[:LENGTH]].copy()
+        b = bboxes2[selected]
+        g = bboxes1[selected]
 
-        print(pred_fiou[ordered[:10]])
-        for i in range(0, len(gt_bboxes)):
-            gt_bbox = gt_bboxes[i]
-            pred_bbox = pred_bboxes[i]
+        f = [filenames[i] for i in np.where(selected)[0]]
+
+        fious = np.array(calc_fiou(b, g, False))
+        
+
+        for k, gt_bbox in enumerate(g):
 
             img_folder = future_label_root.replace(gt_folder, "images")
-            img_file = filenames[ordered[i]].replace("txt", "jpg")
-            # print(len(filenames))
-            # print(future_label_root, img_file)
-            # print(img_file)
+            img_file = f[k].replace("txt", "jpg")
             im = cv2.imread(img_file)
 
-            
+            pred_bbox = b[k]
+
             w, h = gt_bbox[-1, 2:] 
             x,y = gt_bbox[-1, :2] - gt_bbox[-1, 2:] /2
             mid_x, mid_y = gt_bbox[-1, :2]
@@ -338,11 +334,65 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
             im = draw_shaded_box(im,x,w,y,h,2,(244, 149, 66),0.8,cross_size=8)
             im = draw_trajectory(im,pred_bbox[:, 0],pred_bbox[:, 1], (244, 149, 66),2)
 
-            output_folder = img_folder.replace("train", f"outputs/{exp_name}/{perf_type}").replace("img1", "")
+            output_folder = img_folder.replace("train", f"outputs/{exp_name}/traj").replace("img1", "")
             mkdirs(output_folder)
             frame_num = img_file.split("/")[-1]
             # print(output_folder, (x, y, w, h))
-            cv2.imwrite(output_folder + f"{i}.jpg", im)
+        
+            cv2.imwrite(output_folder + f"{obj_id}_{frame_num}.jpg", im)
+
+
+
+
+        # pred_fiou = np.array(calc_fiou(bboxes1, bboxes2, False))
+
+        # if GOOD:
+        #     ordered = np.argsort(pred_fiou)[::-1]
+        #     perf_type = "good"
+        # else:
+        #     ordered = np.argsort(pred_fiou)
+        #     perf_type = "bad"
+
+        # gt_bboxes = bboxes1[ordered[:LENGTH]].copy()
+        # pred_bboxes = bboxes2[ordered[:LENGTH]].copy()
+
+        # print(pred_fiou[ordered[:10]])
+        # for i in range(0, len(gt_bboxes)):
+        #     gt_bbox = gt_bboxes[i]
+        #     pred_bbox = pred_bboxes[i]
+
+        #     img_folder = future_label_root.replace(gt_folder, "images")
+        #     img_file = filenames[ordered[i]].replace("txt", "jpg")
+        #     # print(len(filenames))
+        #     # print(future_label_root, img_file)
+        #     # print(img_file)
+        #     im = cv2.imread(img_file)
+
+            
+        #     w, h = gt_bbox[-1, 2:] 
+        #     x,y = gt_bbox[-1, :2] - gt_bbox[-1, 2:] /2
+        #     mid_x, mid_y = gt_bbox[-1, :2]
+
+        #     x,y,w,h,mid_x,mid_y = int(x), int(y), int(w), int(h), int(mid_x), int(mid_y)
+
+        #     im = draw_shaded_box(im,x,w,y,h,2,(120,240,120),0.8,cross_size=8)
+        #     im = draw_trajectory(im,gt_bbox[:, 0],gt_bbox[:, 1],(120,240,120),2)
+
+
+        #     w, h = pred_bbox[-1, 2:] 
+        #     x,y = pred_bbox[-1, :2] - pred_bbox[-1, 2:] /2
+        #     mid_x, mid_y = pred_bbox[-1, :2]
+
+        #     x,y,w,h,mid_x,mid_y = int(x), int(y), int(w), int(h), int(mid_x), int(mid_y)
+
+        #     im = draw_shaded_box(im,x,w,y,h,2,(244, 149, 66),0.8,cross_size=8)
+        #     im = draw_trajectory(im,pred_bbox[:, 0],pred_bbox[:, 1], (244, 149, 66),2)
+
+        #     output_folder = img_folder.replace("train", f"outputs/{exp_name}/{perf_type}").replace("img1", "")
+        #     mkdirs(output_folder)
+        #     frame_num = img_file.split("/")[-1]
+        #     # print(output_folder, (x, y, w, h))
+        #     cv2.imwrite(output_folder + f"{i}.jpg", im)
 
 
 

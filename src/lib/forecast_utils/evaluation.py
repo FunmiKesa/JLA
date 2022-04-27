@@ -19,6 +19,9 @@ mm.lap.default_solver = 'lap'
 def get_bboxes(gt_label_root, pred_length=30, gt_folder='future', pred_folder='pred', fixed_length=False):
     bboxes1 = []
     bboxes2 = []
+
+    obj_ids1_arr = []
+    obj_ids2_arr = []
     pred_label_root = gt_label_root.replace(gt_folder, pred_folder)
     gt_files = sorted(glob.glob(gt_label_root+"/*.txt"))
     pred_files = sorted(glob.glob(pred_label_root+"/*.txt"))
@@ -39,10 +42,13 @@ def get_bboxes(gt_label_root, pred_length=30, gt_folder='future', pred_folder='p
         filename2 = filename1.replace(smaller_folder, larger_folder)
 
         bbox1, mask1 = load_txt(filename1, column_length=pred_length*4+1)
+        obj_ids1 =  bbox1[:, 0]
         mask1 = mask1[:, 1:].reshape(mask1.shape[0], -1, 4)
         bbox1 = bbox1[:, 1:].reshape(bbox1.shape[0], pred_length, -1)
 
         bbox2, mask2 = load_txt(filename2, column_length=pred_length*4+1)
+        obj_ids2 =  bbox2[:, 0]
+
         mask2 = mask2[:, 1:].reshape(mask2.shape[0], -1, 4)
         bbox2 = bbox2[:, 1:].reshape(bbox2.shape[0], pred_length, -1)
 
@@ -65,9 +71,11 @@ def get_bboxes(gt_label_root, pred_length=30, gt_folder='future', pred_folder='p
 
         bbox1 = bbox1[match_is]
         mask1 = mask1[match_is]
+        obj_ids1 = obj_ids1[match_is]
 
         bbox2 = bbox2[match_js]
         mask2 = mask2[match_js]
+        obj_ids2 = obj_ids2[match_js]
 
         mask = mask1 & mask2
             
@@ -80,6 +88,9 @@ def get_bboxes(gt_label_root, pred_length=30, gt_folder='future', pred_folder='p
             bbox1 = bbox1[obj_filter]
             bbox2 = bbox2[obj_filter]
 
+            obj_ids1 = obj_ids1[obj_filter]
+            obj_ids2 = obj_ids2[obj_filter]
+
             # or
             # total = pred_length * 4
             # obj_filter = mask.sum(axis=(1,2)) == total
@@ -88,6 +99,10 @@ def get_bboxes(gt_label_root, pred_length=30, gt_folder='future', pred_folder='p
 
         bboxes1 += [bbox1]
         bboxes2 += [bbox2]
+
+        obj_ids1_arr += [obj_ids1]
+        obj_ids2_arr += [obj_ids2]
+
         if len(bbox1):
             info.extend([filename1.replace(smaller_folder, "images")] * len(bbox1))
 
@@ -101,8 +116,20 @@ def get_bboxes(gt_label_root, pred_length=30, gt_folder='future', pred_folder='p
     else:
         bboxes2 = np.array([])
 
+    if len(obj_ids1_arr) > 0:
+        obj_ids1_arr = np.concatenate(obj_ids1_arr)
+    else:
+        obj_ids1_arr = np.array([])
+
+    if len(obj_ids2_arr) > 0:
+        obj_ids2_arr = np.concatenate(obj_ids2_arr)
+    else:
+        obj_ids2_arr = np.array([])
+
     print(smaller_folder, larger_folder)
-    return {smaller_folder: bboxes1, larger_folder: bboxes2, "filenames":info}
+    return {smaller_folder: bboxes1, larger_folder: bboxes2, "filenames":info, "ids": {
+        smaller_folder: obj_ids1_arr, larger_folder: obj_ids2_arr
+    }}
 
  
 def eval_seq(gt_label_root, pred_length=30, gt_folder='future', pred_folder='pred', fixed_length=True, return_mean=True):
