@@ -46,10 +46,11 @@ class STrack(BaseTrack):
         self.pasts = deque([], maxlen=past_length)
         self.alpha = 0.9
         self.forecasts = []
-        self.forecast_score = 0
+        self.forecasts_score = 0
         self.forecast_index = 0
         self.use_kf = use_kf
         self.forecasts_kf = []
+        self.consecutive_pasts_len  = 0
 
     def update_features(self, feat):
         if feat is None:
@@ -130,6 +131,17 @@ class STrack(BaseTrack):
     #         for i in range(len(stracks)):
     #             stracks[i].forecasts = multi_mean_for[i,...]
 
+    def update_forecast_params(self, add_past=True, reset_time=True):
+
+        if add_past:
+            self.pasts.append([self.frame_id, self.track_id] + list(self.tlbr))
+            self.consecutive_pasts_len = len(self.pasts)
+
+        if reset_time:
+            self.time_since_update = 0
+            self.forecast_index = 0
+
+
     def activate(self, kalman_filter, frame_id):
         """Start a new tracklet"""
         self.kalman_filter = kalman_filter
@@ -145,11 +157,11 @@ class STrack(BaseTrack):
         # self.is_activated = True
         self.frame_id = frame_id
         self.start_frame = frame_id
+        print("Activated ", self)
 
     def re_activate(self, new_track, frame_id, new_id=False):
-        self.time_since_update = 0
-        self.forecast_index = 0
-        self.pasts.append([self.frame_id, self.track_id] + list(self.tlbr))
+        
+        self.update_forecast_params()
 
         if self.use_kf:
             self.mean, self.covariance = self.kalman_filter.update(
@@ -163,6 +175,7 @@ class STrack(BaseTrack):
         self.state = TrackState.Tracked
         self.is_activated = True
         self.frame_id = frame_id
+        self.score = new_track.score
         # self.forecast_score = 0
 
         if new_id:
@@ -170,6 +183,7 @@ class STrack(BaseTrack):
         # store previous xywh
         # self.pasts.append([self.frame_id, self.track_id] + list(self.tlbr))
         # self.forecasts = new_track.forecasts
+        print("Re-activated ", self)
 
     def update(self, new_track, frame_id, update_feature=True, forecast=False):
         """
@@ -182,14 +196,7 @@ class STrack(BaseTrack):
         self.frame_id = frame_id
         self.tracklet_len += 1
 
-        if not forecast:
-            self.time_since_update = 0
-            self.forecast_index = 0
-        else:
-            self.time_since_update += 1
-
-        # store previous xywh
-        self.pasts.append([self.frame_id, self.track_id] + list(self.tlbr))
+        self.update_forecast_params(reset_time=not forecast)
 
         new_tlwh = new_track.tlwh
         if self.use_kf:
@@ -197,11 +204,7 @@ class STrack(BaseTrack):
                 self.mean, self.covariance, self.tlwh_to_xyah(new_tlwh)
             )
         else:
-            # use forecast
             self._tlwh = new_tlwh
-            # if len(self.forecasts):
-            #     if use_forecast:
-            #         self._tlwh = STrack.tlbr_to_tlwh(np.asarray([self.forecasts[self.forecast_index], new_track.tlbr]).mean(axis=0))
 
         self.state = TrackState.Tracked
         self.is_activated = True
@@ -209,6 +212,7 @@ class STrack(BaseTrack):
         self.score = new_track.score
         if update_feature:
             self.update_features(new_track.curr_feat)
+        print("Updated ", self)
 
     @property
     # @jit(nopython=True)
@@ -289,12 +293,14 @@ class STrack(BaseTrack):
         return ret
 
     def __repr__(self):
-        return "OT_{}_({}-{})_({}_{})".format(
+        return "OT_{}_({}-{})_({}_{})_{}_{}".format(
             self.track_id,
             self.start_frame,
             self.end_frame,
             self.time_since_update,
             self.forecast_index,
+            round(self.score *100, 2) ,
+            round(self.forecasts_score*100, 2)
         )
 
 
@@ -458,8 +464,8 @@ class JDETracker(object):
                     labels[..., [1, 3]] *= output_h
 
                     # flip - oldest first
-                    labels = np.flip(labels, 1)
-                    pasts_mask = np.flip(pasts_mask, 1)
+                    labels = np.flip(labels, 1).copy()
+                    pasts_mask = np.flip(pasts_mask, 1).copy()
                     labels = labels * pasts_mask[:objs_count, :, None]
 
                     labels_change = (
@@ -473,6 +479,8 @@ class JDETracker(object):
                     self.pasts = torch.tensor(pasts, device=self.opt.device)
 
             im_blob += [self.pasts]
+
+        print("\n Frame ", self.frame_id)
 
         """ Step 1: Network forward, get detections & embeddings"""
         with torch.no_grad():
@@ -491,6 +499,11 @@ class JDETracker(object):
             if len(selected_strack) > 0:
                 pred_pasts, pred_futures = output["fct"]
                 pred_futures = pred_futures.cpu().numpy()[..., :4]
+
+                pred_pasts = pred_pasts.cpu()
+                self.pasts  = self.pasts.cpu()
+                pred_pasts = pred_pasts * torch.tensor(pasts_mask, device='cpu')[..., None]
+
                 # flip back
                 mask = np.flip(pasts_mask, 1)
                 mask = mask.max(axis=1)
@@ -543,11 +556,29 @@ class JDETracker(object):
         # id0 = id0-1
         # """
         keys = list(selected_strack.keys())
+        current_forecasts = {}
         if len(selected_strack) > 0:
             for i, tid in enumerate(keys):
                 t = selected_strack[tid]
                 forecasts = pred_futures[i]
-                t.forecasts = forecasts
+                ious = np.diag(bbox_iou(pred_pasts[i], self.pasts[i]).numpy())
+                iou = ious.sum() / pasts_mask[i].sum()
+                if (len(t.forecasts) != 0):
+                    # print(forecasts[0], t.forecasts[1])
+                
+                    # find the mean
+                    forecasts[:len(t.forecasts)] = (forecasts[:len(t.forecasts)] + t.forecasts) / 2
+                    
+                else:
+                    t.forecasts = forecasts
+                    t.forecasts_scoree = iou
+
+                    # print(forecasts[0])
+                # t.forecasts = forecasts
+                
+
+                current_forecasts[t.track_id] = (forecasts, iou)
+                print(t)
 
         if len(dets) > 0:
             """Detections"""
@@ -605,8 +636,14 @@ class JDETracker(object):
         for itracked, idet in matches:
             track = strack_pool[itracked]
             det = detections[idet]
-            if self.forecast:
-                track.forecast_index = int(forecasts_inds[itracked, idet])
+            # if self.forecast:
+            #     track.forecast_index = int(forecasts_inds[itracked, idet])
+            print("Embedding", track)
+
+            # update track forecast
+            if track.track_id in current_forecasts:
+                track.forecasts = current_forecasts[track.track_id][0]
+                track.forecasts_score= current_forecasts[track.track_id][1]
 
             if track.state == TrackState.Tracked:
                 track.update(detections[idet], self.frame_id)
@@ -631,6 +668,7 @@ class JDETracker(object):
         for itracked, idet in matches:
             track = r_tracked_stracks[itracked]
             det = detections[idet]
+            print("IoU", track)
 
             if track.state == TrackState.Tracked:
                 track.update(det, self.frame_id)
@@ -653,20 +691,28 @@ class JDETracker(object):
                 if not track.state == TrackState.Lost:
                     track.mark_lost()
                     lost_stracks.append(track)
+                    # track.is_activated = False
+                    print("Deactivated 1 ", track)
 
-            dists = matching.iou_distance(r_tracked_stracks, forecasts)
-            matches, u_track, _ = matching.linear_assignment(dists, thresh=0.5)
 
-            for itracked, idet in matches:
-                track = r_tracked_stracks[itracked]
-                det = forecasts[idet]
-                track.update(det, self.frame_id, update_feature=False, forecast=True)
-                activated_starcks.append(track)
+            u_track = []
 
-                # else:
-                #     track.mark_occluded();
-                #     track.re_activate(det, self.frame_id, new_id=False)
-                #     refind_stracks.append(track)
+            if len(r_tracked_stracks) > 0:
+                dists = matching.iou_distance(r_tracked_stracks, forecasts)
+                dists = np.diagonal(dists)
+                # matches, u_track, _ = matching.linear_assignment(dists, thresh=0.5)
+                for i, dist in enumerate(dists):
+                    if dist > 0.5:
+                        # track.is_activated = False
+                        print("Deactivated 2 ", track)
+
+                        u_track.append(i)
+                        continue
+
+                    track = r_tracked_stracks[i]
+                    det = forecasts[i]
+                    track.update(det, self.frame_id, update_feature=False, forecast=True)
+                    activated_starcks.append(track)
 
         for it in u_track:
             track = r_tracked_stracks[it]
@@ -697,8 +743,19 @@ class JDETracker(object):
             activated_starcks.append(track)
         """ Step 5: Update state"""
         for track in self.lost_stracks:
+            if track.state == TrackState.Tracked:
+                print("Not lost",self.frame_id, track)
+                continue
+
             track.time_since_update += 1
-            # track.pasts.append([self.frame_id-1, track.track_id] + list(track.tlbr))
+            # track.pasts.append([track.frame_id, track.track_id] + list(track.tlbr))
+            # if len(track.forecasts):
+            #     loc = track.forecasts[0]
+            #     loc[2:] -= loc[:2]
+            #     track._tlbwh  = loc
+            # if len(track.forecasts) > 1:
+            track.forecasts = track.forecasts[1:]
+            track.consecutive_pasts_len -= 1
 
             if self.frame_id - track.end_frame > self.max_time_lost:
                 track.mark_removed()
@@ -747,16 +804,66 @@ def frame_distance(xywh, img_size):
 
     return dist
 
+DEBUG = True
+def print_track(track, message):
+    if DEBUG:
+        print(message, track)
 
 def forecast_track_in_frame(track, img_size=()):
+    print_track(track, "Forecast ")
     pred = None
 
     futures = track.forecasts
-    forecast_index = track.time_since_update - track.forecast_index
+    forecast_index = 0
 
     max_threshold = 20
+
+    if len(futures) > 0:
+        if (track.tracklet_len + len(track.pasts)) >= (track.past_length + 5):
+            tlbr = futures[forecast_index]
+            if np.nan not in tlbr:
+                tlwh = STrack.tlbr_to_tlwh(tlbr)
+                xywh = tlwh.copy()
+                xywh[0] += xywh[2] / 2
+                xywh[1] += xywh[3] / 2
+
+                tsu = (track.time_since_update + 1)/ max_threshold
+
+                lambda_ = 0.5
+                if len(img_size):
+                    f_dist = frame_distance([xywh], img_size)[0]
+                    # f = lambda_  * f_dist + (1-lambda_)  * tsu
+                    f = (1 - f_dist) * (1 - tsu)
+
+                    if f >= 0.15:
+                        pred = STrack(
+                            tlwh, track.score, track.smooth_feat, 30, past_length=track.past_length
+                        )
+                        track.forecast_index += 1
+                        print_track(track, "Forecast Update")
+                    else:
+                        print_track(None, f"Low score {track} {f} {forecast_index}")
+                        # print_track(track, f"Low score {f}")
+                else:
+                    print_track(track, "Invalid image size.")
+            else:
+                print_track(track, "Nan values.")
+        else:
+            print_track(track, "Tracklen is too short.")
+    else:
+        print_track(track, "Forecasts not available.")
+    
+    track.time_since_update += 1
+
+    # shift forecasts
+    futures = futures[1:]
+    track.forecasts = futures
+
+    return pred
+
+
     if (track.tracklet_len + len(track.pasts)) < (track.past_length + 5):
-        # if (track.tracklet_len < 5) or (track.forecasts_scores < 0.4):
+        # if (track.tracklet_len < 5) or (track.forecasts_score < 0.4):
         return pred
 
     # forecast_index = (track.forecast_index + 1) * track.time_since_update
@@ -770,7 +877,7 @@ def forecast_track_in_frame(track, img_size=()):
     xywh[0] += xywh[2] / 2
     xywh[1] += xywh[3] / 2
 
-    tsu = track.time_since_update / max_threshold
+    tsu = (track.time_since_update + 1)/ max_threshold
 
     lambda_ = 0.5
     if len(img_size):
@@ -778,6 +885,7 @@ def forecast_track_in_frame(track, img_size=()):
         # f = lambda_  * f_dist + (1-lambda_)  * tsu
         f = (1 - f_dist) * (1 - tsu)
 
+    # if f > 0.55:
     if f < 0.15:
         print("Low score", track, f, forecast_index)
         return pred
@@ -786,7 +894,11 @@ def forecast_track_in_frame(track, img_size=()):
         tlwh, track.score, track.smooth_feat, 30, past_length=track.past_length
     )
     track.forecast_index += 1
-    print(f"Updated {track}")
+    print(f"Forecast Update {track}")
+    track.time_since_update += 1
+    futures[:-1] = futures[1:]
+    futures[-1, :] = np.nan
+    track.forecasts = futures
 
     return pred
 
