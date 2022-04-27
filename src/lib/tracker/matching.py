@@ -189,9 +189,9 @@ def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.75, max_length=10):
             print("Use cost_matrix only ", track)
             continue
         else:
-            loc=track.forecasts[:1]
-            lambda_ = 1 - (0.3  * (track.forecasts_score)) - 0.2
-            
+            loc = track.forecasts[:1]
+            lambda_ = 1 - (0.3 * (track.forecasts_score)) - 0.2
+
         d = iou_distance(loc, dets)[0]
         cost_matrix[row, d >= 1] *= 2
         cost_matrix[row] = lambda_ * cost_matrix[row] + (1 - lambda_) * d
