@@ -193,6 +193,16 @@ def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.75, max_length=10):
             lambda_ = 1 - (0.3 * (track.forecasts_score)) - 0.2
 
         d = iou_distance(loc, dets)[0]
+        size_d  = size_distance(loc, dets)
+        norm_d = normalized_euclidean_distance(loc, dets)
+        centre_d = centre_distance(loc, dets)
+        print("\n", track)
+        print("cost_matrix: ", cost_matrix[row])
+        print("iou distance: ", d)
+        print("size distance: ", size_d)
+        print("norm distance: ", norm_d)
+        print("centre distance: ", centre_d)
+
         cost_matrix[row, d >= 1] *= 2
         cost_matrix[row] = lambda_ * cost_matrix[row] + (1 - lambda_) * d
     return cost_matrix, forecasts_inds
@@ -231,8 +241,16 @@ def normalized_euclidean_distance(atracks, btracks):
     if (len(atracks) > 0 and isinstance(atracks[0], np.ndarray)) or (
         len(btracks) > 0 and isinstance(btracks[0], np.ndarray)
     ):
-        axywhs = atracks
-        bxywhs = btracks
+        # convert to xywh
+        axywhs = atracks.copy()
+        bxywhs = btracks.copy()
+        
+        axywhs[:, 2:] -= axywhs[:, :2]
+        axywhs[:, :2] += (axywhs[:, 2:] / 2)
+
+        bxywhs[:, 2:] -= bxywhs[:, :2]
+        bxywhs[:, :2] += (bxywhs[:, 2:] / 2)
+
     else:
         axywhs = np.array([track.xywh for track in atracks])
         bxywhs = np.array([track.xywh for track in btracks])
@@ -243,12 +261,70 @@ def normalized_euclidean_distance(atracks, btracks):
 
     for i in range(len(axywhs)):
         axywh = axywhs[i][:2]
-        bxywh = bxywhs[i][:2]
+        bxywh = bxywhs[:, :2]
 
         dist = 0.5 * (
-            (axywh - bxywh).var(keepdims=True)
-            / (axywh.var(keepdims=True) + bxywh.var(keepdims=True) + 1e-8)
+            (axywh - bxywh).var(axis=1)
+            / (axywh.var() + bxywh.var(axis=1) + 1e-8)
         )
-        dists[i, i] = dist ** 0.5
+        dists[i] = dist ** 0.5
+
+    return dists
+
+def centre_distance(atracks, btracks):
+    if (len(atracks) > 0 and isinstance(atracks[0], np.ndarray)) or (
+        len(btracks) > 0 and isinstance(btracks[0], np.ndarray)
+    ):
+        # convert to xywh
+        axywhs = atracks.copy()
+        bxywhs = btracks.copy()
+        
+        axywhs[:, 2:] -= axywhs[:, :2]
+        axywhs[:, :2] += (axywhs[:, 2:] / 2)
+
+        bxywhs[:, 2:] -= bxywhs[:, :2]
+        bxywhs[:, :2] += (bxywhs[:, 2:] / 2)
+    else:
+        axywhs = np.array([track.xywh for track in atracks])
+        bxywhs = np.array([track.xywh for track in btracks])
+
+    dists = np.ones((len(axywhs), len(bxywhs)), dtype=np.float)
+
+    for i in range(len(axywhs)):
+        axywh = axywhs[i][:2]
+        bxywh = bxywhs[:, :2]
+
+        dist = np.linalg.norm(axywh - bxywh, axis=1)
+
+        dists[i] = dist / max(dist)
+
+    return dists
+
+def size_distance(atracks, btracks):
+    if (len(atracks) > 0 and isinstance(atracks[0], np.ndarray)) or (
+        len(btracks) > 0 and isinstance(btracks[0], np.ndarray)
+    ):
+        # convert to xywh
+        axywhs = atracks.copy()
+        bxywhs = btracks.copy()
+        
+        axywhs[:, 2:] -= axywhs[:, :2]
+        axywhs[:, :2] += (axywhs[:, 2:] / 2)
+
+        bxywhs[:, 2:] -= bxywhs[:, :2]
+        bxywhs[:, :2] += (bxywhs[:, 2:] / 2)
+    else:
+        axywhs = np.array([track.xywh for track in atracks])
+        bxywhs = np.array([track.xywh for track in btracks])
+
+    dists = np.ones((len(axywhs), len(bxywhs)), dtype=np.float)
+
+    for i in range(len(axywhs)):
+        axywh = axywhs[i][2:]
+        bxywh = bxywhs[:, 2:]
+
+        dist = np.linalg.norm(axywh - bxywh, axis=1) 
+
+        dists[i] = dist / max(dist)
 
     return dists
