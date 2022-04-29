@@ -19,7 +19,7 @@ from tracking_utils.timer import Timer
 from tracking_utils.evaluation import Evaluator
 import datasets.dataset.jde as datasets
 from tracking_utils.io import unzip_objs
-from tracking_utils.utils import mkdirs
+from tracking_utils.utils import mkdirs, visualize, analyze
 from opts import opts
 import shutil
 
@@ -75,7 +75,8 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
     frame_id = int(len_all / 2)
     forecast_results = []
     evaluator = Evaluator(opt.data_root, opt.seq, data_type)
-
+    forecast_hist = {}
+    
     for i, (path, img, img0) in enumerate(dataloader):
         if i < start_frame:
             continue
@@ -104,6 +105,11 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
                     online_forecasts.append(
                         np.array([tid] + list(t.forecasts_xywh.reshape(-1))))
         timer.toc()
+
+        try:
+            forecast_hist.update(tracker.forecast_hist)
+        except:
+            pass
         # save results
         results.append((frame_id + 1, online_tlwhs, online_ids))
         if len(online_forecasts):
@@ -130,7 +136,7 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
     if len(forecast_results):
         write_results_forecasts(opt.forecast_dir, forecast_results)
     #write_results_score(result_filename, results, data_type)
-    return frame_id, timer.average_time, timer.calls
+    return frame_id, timer.average_time, timer.calls, forecast_hist
 
 
 def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), exp_name='demo',
@@ -165,7 +171,7 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
         # delete later
         opt.data_root = data_root
         opt.seq = seq
-        nf, ta, tc = eval_seq(opt, dataloader, data_type, result_filename,
+        nf, ta, tc, forecast_hist = eval_seq(opt, dataloader, data_type, result_filename,
                               save_dir=output_dir, show_image=show_image, frame_rate=frame_rate)
         n_frame += nf
         timer_avgs.append(ta)
@@ -174,7 +180,8 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
         # eval
         logger.info('Evaluate seq: {}'.format(seq))
         evaluator = Evaluator(data_root, seq, data_type)
-        accs.append(evaluator.eval_file(result_filename))
+        acc = evaluator.eval_file(result_filename)
+        accs.append(acc)
         summary = Evaluator.get_summary(accs, seqs[:i+1], metrics)
         strsummary = mm.io.render_summary(
             summary,
@@ -182,6 +189,15 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
             namemap=mm.io.motchallenge_metric_names
         )
         logger.info("\n"+strsummary)
+
+        all, all_idx, part, part_idx = analyze(acc, forecast_hist)
+        mkdirs("output")
+        from pprint import pprint
+        print(seq)
+        pprint(part_idx)
+        pprint(all_idx)
+        visualize(all, part, keys=["MATCH", "FP"], filename=f"output/{seq}.jpg")
+
         # summary.to_csv(os.path.join(result_root, 'summary_{}.csv'.format(exp_name)))
         # evaluate forecast results
         if opt.forecast:
@@ -251,6 +267,7 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
 if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = '1'
     opt = opts().init()
+    print(opt)
 
     if not opt.val_mot16:
         seqs_str = '''KITTI-13
@@ -309,8 +326,7 @@ if __name__ == '__main__':
         #seqs_str = '''MOT17-07-SDP MOT17-08-SDP'''
         data_root = os.path.join(opt.data_dir, 'MOT17/images/test')
     if opt.val_mot17:
-        seqs_str = '''
-                      MOT17-02-SDP
+        seqs_str = '''MOT17-02-SDP
                       MOT17-04-SDP
                       MOT17-05-SDP
                       MOT17-09-SDP
@@ -349,7 +365,7 @@ if __name__ == '__main__':
                       '''
         data_root = os.path.join(opt.data_dir, 'MOT20/images/test')
     seqs = [seq.strip() for seq in seqs_str.split()]
-    # seqs = ["MOT17-13-SDP"]
+    seqs = ["MOT17-02-SDP"]
 
     if opt.forecast:
         opt.forecast_root = data_root.replace('images', 'future')
@@ -360,6 +376,6 @@ if __name__ == '__main__':
          seqs=seqs,
          exp_name=opt.exp_id,
          show_image=False,
-        #  save_images=True,
-         save_images=False,
+         save_images=True,
+        #  save_images=False,
          save_videos=False)

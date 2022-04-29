@@ -320,6 +320,7 @@ class JDETracker(object):
         self.tracked_stracks = []  # type: list[STrack]
         self.lost_stracks = []  # type: list[STrack]
         self.removed_stracks = []  # type: list[STrack]
+        self.forecast_hist = {}
 
         self.frame_id = 0
         self.det_thresh = opt.conf_thres
@@ -477,7 +478,7 @@ class JDETracker(object):
 
                     pasts = pasts * pasts_mask[:, :, np.newaxis]
                     self.pasts = torch.tensor(pasts, device=self.opt.device)
-
+                del t
             im_blob += [self.pasts]
 
         print("\n Frame ", self.frame_id)
@@ -563,21 +564,22 @@ class JDETracker(object):
                 forecasts = pred_futures[i]
                 ious = np.diag(bbox_iou(pred_pasts[i], self.pasts[i]).numpy())
                 iou = ious.sum() / pasts_mask[i].sum()
-                if (len(t.forecasts) != 0):
+                # if (len(t.forecasts) != 0):
                     # print(forecasts[0], t.forecasts[1])
                 
                     # find the mean
-                    forecasts[:len(t.forecasts)] = (forecasts[:len(t.forecasts)] + t.forecasts) / 2
+                    # forecasts[:len(t.forecasts)] = (forecasts[:len(t.forecasts)] + t.forecasts) / 2
                     
-                else:
-                    t.forecasts = forecasts
-                    t.forecasts_scoree = iou
+                # else:
+                    # t.forecasts = forecasts
+                    # t.forecasts_scoree = iou
 
                     # print(forecasts[0])
-                # t.forecasts = forecasts
+                t.forecasts = forecasts
+                t.forecasts_scoree = iou
                 
 
-                current_forecasts[t.track_id] = (forecasts, iou)
+                # current_forecasts[t.track_id] = (forecasts, iou)
                 print(t)
 
         if len(dets) > 0:
@@ -651,6 +653,9 @@ class JDETracker(object):
             else:
                 track.re_activate(det, self.frame_id, new_id=False)
                 refind_stracks.append(track)
+            
+            del track
+            del det
 
         r_tracked_stracks = list(strack_pool)
 
@@ -676,6 +681,9 @@ class JDETracker(object):
             else:
                 track.re_activate(det, self.frame_id, new_id=False)
                 refind_stracks.append(track)
+            
+            del track
+            del det
 
         """ Use forecast predictions"""
         if self.forecast:
@@ -702,6 +710,7 @@ class JDETracker(object):
                 dists = np.diagonal(dists)
                 # matches, u_track, _ = matching.linear_assignment(dists, thresh=0.5)
                 for i, dist in enumerate(dists):
+                    track = r_tracked_stracks[i]
                     if dist > 0.5:
                         # track.is_activated = False
                         print("Deactivated 2 ", track)
@@ -709,16 +718,24 @@ class JDETracker(object):
                         u_track.append(i)
                         continue
 
-                    track = r_tracked_stracks[i]
                     det = forecasts[i]
                     track.update(det, self.frame_id, update_feature=False, forecast=True)
                     activated_starcks.append(track)
+
+                    if self.frame_id not in self.forecast_hist:
+                        self.forecast_hist[self.frame_id] = []
+
+                    self.forecast_hist[self.frame_id].append(track.track_id)
+
+                    del track
+                    del det
 
         for it in u_track:
             track = r_tracked_stracks[it]
             if not track.state == TrackState.Lost:
                 track.mark_lost()
                 lost_stracks.append(track)
+            del track
 
         """Deal with unconfirmed tracks, usually tracks with only one beginning frame"""
         detections = [detections[i] for i in u_detection]
@@ -733,6 +750,7 @@ class JDETracker(object):
             track = unconfirmed[it]
             track.mark_removed()
             removed_stracks.append(track)
+            del track
 
         """ Step 4: Init new stracks"""
         for inew in u_detection:
@@ -741,6 +759,8 @@ class JDETracker(object):
                 continue
             track.activate(self.kalman_filter, self.frame_id)
             activated_starcks.append(track)
+            del track
+            
         """ Step 5: Update state"""
         for track in self.lost_stracks:
             if track.state == TrackState.Tracked:
@@ -760,6 +780,9 @@ class JDETracker(object):
             if self.frame_id - track.end_frame > self.max_time_lost:
                 track.mark_removed()
                 removed_stracks.append(track)
+            
+            del track
+        
 
         self.tracked_stracks = [
             t for t in self.tracked_stracks if t.state == TrackState.Tracked
@@ -911,6 +934,7 @@ def get_forecast_distance(tracks, img_size):
         if forecast != None:
             forecasts.append(forecast)
             selected.append(i)
+        del forecast
 
     return forecasts, selected
 
