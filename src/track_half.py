@@ -23,6 +23,8 @@ from tracking_utils.utils import mkdirs, visualize, analyze
 from opts import opts
 import shutil
 
+logger.setLevel(logging.DEBUG)
+
 
 def write_results_forecasts(dir, results):
     if os.path.exists(dir):
@@ -92,6 +94,7 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
         online_scores = []
         online_forecasts = []
         online_forecasts_str = ""
+        frame_id += 1
         for t in online_targets:
             tlwh = t.tlwh
             tid = t.track_id
@@ -101,9 +104,10 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
                 online_ids.append(tid)
                 online_scores.append(t.score)
                 if t.tracklet_len > 0 and len(t.forecasts):
-                    online_forecasts_str += f"{tid} {'  '.join(list(t.forecasts_xywh.reshape(-1).round(2).astype(str)))}\n"
+                    forecasts_xywh  = t.forecasts_xywh[max(0, t.forecast_index):].reshape(-1)
+                    online_forecasts_str += f"{tid} {'  '.join(list(forecasts_xywh.round(2).astype(str)))}\n"
                     online_forecasts.append(
-                        np.array([tid] + list(t.forecasts_xywh.reshape(-1))))
+                        np.array([tid] + list(forecasts_xywh)))
         timer.toc()
 
         try:
@@ -111,12 +115,12 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
         except:
             pass
         # save results
-        results.append((frame_id + 1, online_tlwhs, online_ids))
+        results.append((frame_id, online_tlwhs, online_ids))
         if len(online_forecasts):
-            forecast_results.append((frame_id + 1, online_forecasts_str))
+            forecast_results.append((frame_id, online_forecasts_str))
         #results.append((frame_id + 1, online_tlwhs, online_ids, online_scores))
         if show_image or save_dir is not None:
-            gt_objs = evaluator.gt_frame_dict.get(frame_id+1, [])
+            gt_objs = evaluator.gt_frame_dict.get(frame_id, [])
             gt_tlwhs, gt_ids = unzip_objs(gt_objs)[:2]
             online_im = vis.plot_tracking(img0, online_tlwhs, online_ids, frame_id=frame_id,scores=online_scores,
                                           fps=1. / timer.average_time, gt_tlwhs=gt_tlwhs, gt_ids=gt_ids, forecasts=online_forecasts)
@@ -129,8 +133,7 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
             cv2.imshow('online_im', online_im)
             cv2.waitKey(1)
         if save_dir is not None:
-            cv2.imwrite(os.path.join(save_dir, '{:05d}.jpg'.format(frame_id)), online_im)
-        frame_id += 1
+            cv2.imwrite(os.path.join(save_dir, '{:05d}.jpg'.format(frame_id-start_frame)), online_im)
     # save results
     write_results(result_filename, results, data_type)
     if len(forecast_results):
@@ -365,7 +368,7 @@ if __name__ == '__main__':
                       '''
         data_root = os.path.join(opt.data_dir, 'MOT20/images/test')
     seqs = [seq.strip() for seq in seqs_str.split()]
-    seqs = ["MOT17-02-SDP"]
+    # seqs = ["MOT17-02-SDP"]
 
     if opt.forecast:
         opt.forecast_root = data_root.replace('images', 'future')

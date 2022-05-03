@@ -97,7 +97,9 @@ def plot_tracking(image, tlwhs, obj_ids, scores=None, frame_id=0, fps=0., ids2=N
         
         intbox = tuple(map(int, (cx - w/2, cy - h/2, cx + w/2, cy + h/2)))
         color = (255, 255,255) #get_color(abs(obj_id))
-        cv2.rectangle(im, intbox[0:2], intbox[2:4], color=color, thickness=line_thickness)
+        # cv2.rectangle(im, intbox[0:2], intbox[2:4], color=color, thickness=line_thickness)
+        drawrect(im,intbox[0:2], intbox[2:4],color,line_thickness)
+
         id_text = '{}'.format(int(obj_id))
         y  = intbox[1] - 30 if alt_y else intbox[3]+ 30
         cx,cy = np.clip(intbox[0], 0, im_w - 1), np.clip(y, 0, im_h - 1)
@@ -148,4 +150,114 @@ def plot_detections(image, tlbrs, scores=None, color=(255, 0, 0), ids=None):
 
         cv2.rectangle(im, (x1, y1), (x2, y2), color, 2)
 
+    return im
+
+
+def draw_box(frame,start_x,width,start_y,height,line_weight,color):
+    #frame[int(start_y):int(start_y+height),int(start_x):int(start_x+width),:] = 255
+    # Top line
+    frame[int(start_y):int(start_y+line_weight),int(start_x):int(start_x+width),0] = color[0]
+    frame[int(start_y):int(start_y+line_weight),int(start_x):int(start_x+width),1] = color[1]
+    frame[int(start_y):int(start_y+line_weight),int(start_x):int(start_x+width),2] = color[2]
+
+    # Bottom line
+    frame[int(start_y+height-line_weight):int(start_y+height),int(start_x):int(start_x+width),0] = color[0]
+    frame[int(start_y+height-line_weight):int(start_y+height),int(start_x):int(start_x+width),1] = color[1]
+    frame[int(start_y+height-line_weight):int(start_y+height),int(start_x):int(start_x+width),2] = color[2]
+
+
+    # Left line
+    frame[int(start_y):int(start_y+height),int(start_x):int(start_x+line_weight),0] = color[0]
+    frame[int(start_y):int(start_y+height),int(start_x):int(start_x+line_weight),1] = color[1]
+    frame[int(start_y):int(start_y+height),int(start_x):int(start_x+line_weight),2] = color[2]
+
+    # Right line
+    frame[int(start_y):int(start_y+height),int(start_x+width-line_weight):int(start_x+width),0] = color[0]
+    frame[int(start_y):int(start_y+height),int(start_x+width-line_weight):int(start_x+width),1] = color[1]
+    frame[int(start_y):int(start_y+height),int(start_x+width-line_weight):int(start_x+width),2] = color[2]
+
+
+    return frame
+
+def drawline(img,pt1,pt2,color,thickness=3,style='dotted',gap=7):
+    dist =((pt1[0]-pt2[0])**2+(pt1[1]-pt2[1])**2)**.5
+    pts= []
+    for i in  np.arange(0,dist,gap):
+        r=i/dist
+        x=int((pt1[0]*(1-r)+pt2[0]*r)+.5)
+        y=int((pt1[1]*(1-r)+pt2[1]*r)+.5)
+        p = (x,y)
+        pts.append(p)
+
+    if style=='dotted':
+        for p in pts:
+            cv2.circle(img,p,thickness,color,-1)
+    else:
+        s=pts[0]
+        e=pts[0]
+        i=0
+        for p in pts:
+            s=e
+            e=p
+            if i%2==1:
+                cv2.line(img,s,e,color,thickness)
+            i+=1
+
+def drawpoly(img,pts,color,thickness=1,style='dotted',):
+    s=pts[0]
+    e=pts[0]
+    pts.append(pts.pop(0))
+    for p in pts:
+        s=e
+        e=p
+        drawline(img,s,e,color,thickness,style)
+
+def drawrect(img,pt1,pt2,color,thickness=1,style='line'):
+    pts = [pt1,(pt2[0],pt1[1]),pt2,(pt1[0],pt2[1])]
+    drawpoly(img,pts,color,thickness,style)
+
+def draw_shaded_dotted_box(frame,start_x,width,start_y,height,line_weight,color,opacity,cross_size=10):
+    #frame[int(start_y):int(start_y+height),int(start_x):int(start_x+width),:] = 255
+    overlay = frame.copy()
+    end_x = int(start_x + width)
+    end_y = int(start_y + height)
+    start_x = int(start_x)
+    start_y = int(start_y)
+    cv2.rectangle(frame, (start_x, start_y), (end_x, end_y),color, -1)
+    cv2.addWeighted(overlay, opacity, frame, 1 - opacity, 0, frame)
+    drawrect(frame,(start_x,start_y),(end_x,end_y),color,line_weight)
+    mid_x = int((start_x + end_x) / 2)
+    mid_y = int((start_y + end_y) / 2)
+
+    frame = cv2.line(frame, (mid_x+cross_size,mid_y-cross_size),(mid_x-cross_size,mid_y+cross_size), color,3)
+    frame = cv2.line(frame, (mid_x+cross_size,mid_y+cross_size),(mid_x-cross_size,mid_y-cross_size), color,3)
+    return frame
+
+def draw_shaded_box(frame,start_x,width,start_y,height,line_weight,color,opacity,cross_size=10):
+    #frame[int(start_y):int(start_y+height),int(start_x):int(start_x+width),:] = 255
+    overlay = frame.copy()
+    end_x = int(start_x + width)
+    end_y = int(start_y + height)
+    start_x = int(start_x)
+    start_y = int(start_y)
+    cv2.rectangle(frame, (start_x, start_y), (end_x, end_y),color, -1)
+    cv2.addWeighted(overlay, opacity, frame, 1 - opacity, 0, frame)
+    frame = draw_box(frame,start_x,width,start_y,height,line_weight,color)
+
+    mid_x = int((start_x + end_x) / 2)
+    mid_y = int((start_y + end_y) / 2)
+
+    frame = cv2.line(frame, (mid_x+cross_size,mid_y-cross_size),(mid_x-cross_size,mid_y+cross_size), color,line_weight)
+    frame = cv2.line(frame, (mid_x+cross_size,mid_y+cross_size),(mid_x-cross_size,mid_y-cross_size), color,line_weight)
+
+    return frame
+
+
+def draw_trajectory(im,xs,ys,color,weight):
+    prev_x = xs[0]
+    prev_y = ys[0]
+    for x,y in zip(xs,ys):
+        im = cv2.line(im, (int(x), int(y)), (int(prev_x), int(prev_y)), color, weight)
+        prev_x = x
+        prev_y = y
     return im

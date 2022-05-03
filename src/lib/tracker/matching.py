@@ -189,22 +189,25 @@ def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.75, max_length=10):
             print("Use cost_matrix only ", track)
             continue
         else:
-            loc = track.forecasts[:1]
-            lambda_ = 1 - (0.3 * (track.forecasts_score)) - 0.2
+            loc = track.forecasts[:1].copy()
+            # loc = track.forecasts[track.forecast_index:track.forecast_index+1].copy()
+            # lambda_ = 1 - (0.3 * (track.forecasts_score)) - 0.2
 
         d = iou_distance(loc, dets)[0]
-        size_d  = size_distance(loc, dets)
-        norm_d = normalized_euclidean_distance(loc, dets)
-        centre_d = centre_distance(loc, dets)
+        # size_d  = size_distance(loc, dets)
+        # norm_d = normalized_euclidean_distance(loc, dets)
+        # centre_d = centre_distance(loc, dets)
         print("\n", track)
-        print("cost_matrix: ", cost_matrix[row])
+        print("cost_matrix 1: ", cost_matrix[row])
         print("iou distance: ", d)
-        print("size distance: ", size_d)
-        print("norm distance: ", norm_d)
-        print("centre distance: ", centre_d)
+        # print("size distance: ", size_d)
+        # print("norm distance: ", norm_d)
+        # print("centre distance: ", centre_d)
 
         cost_matrix[row, d >= 1] *= 2
         cost_matrix[row] = lambda_ * cost_matrix[row] + (1 - lambda_) * d
+        print("cost_matrix 2: ", cost_matrix[row])
+
     return cost_matrix, forecasts_inds
 
 
