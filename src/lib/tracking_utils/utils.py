@@ -492,10 +492,11 @@ def visualize(all, part, keys=[], filename="out.jpg", legends=["all", "part"]):
     width = 0.35
     colors = plt.cm.BuPu(np.linspace(0.5, 1, len(keys)))
 
+    fig = plt.figure(figsize = (10, 5))
     plt.bar(total_all.keys(), all_values, width, bottom=part_values, color=colors[1])
     plt.bar(total_part.keys(), part_values, width, color=colors[0])
     plt.xticks(keys)
     # ax.set_yticks()
     plt.legend(labels=legends)
     plt.savefig(filename)   
-    plt.close()
+    plt.close(fig)

@@ -78,6 +78,7 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
     forecast_results = []
     evaluator = Evaluator(opt.data_root, opt.seq, data_type)
     forecast_hist = {}
+    likelihoods = {}
     
     for i, (path, img, img0) in enumerate(dataloader):
         if i < start_frame:
@@ -103,15 +104,16 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
                 online_tlwhs.append(tlwh)
                 online_ids.append(tid)
                 online_scores.append(t.score)
-                if t.tracklet_len > 0 and len(t.forecasts):
-                    forecasts_xywh  = t.forecasts_xywh[max(0, t.forecast_index):].reshape(-1)
+                if t.tracklet_len > 0 and len(t.forecasts) > t.time_since_update:
+                    forecasts_xywh  = t.forecasts_xywh[max(0, t.time_since_update):].reshape(-1)
                     online_forecasts_str += f"{tid} {'  '.join(list(forecasts_xywh.round(2).astype(str)))}\n"
                     online_forecasts.append(
                         np.array([tid] + list(forecasts_xywh)))
         timer.toc()
 
         try:
-            forecast_hist.update(tracker.forecast_hist)
+            forecast_hist.update(tracker.forecast_hist["ids"])
+            likelihoods.update(tracker.forecast_hist["l"])
         except:
             pass
         # save results
@@ -139,6 +141,13 @@ def eval_seq(opt, dataloader, data_type, result_filename, save_dir=None, show_im
     if len(forecast_results):
         write_results_forecasts(opt.forecast_dir, forecast_results)
     #write_results_score(result_filename, results, data_type)
+    s = result_filename
+    f=open("likelihoods.txt", "a")
+    for k in likelihoods:
+        s += f"\n{k}, {forecast_hist[k]}, {likelihoods[k]}"
+    print(s)
+    f.write(s)
+    f.close()
     return frame_id, timer.average_time, timer.calls, forecast_hist
 
 
@@ -199,7 +208,7 @@ def main(opt, data_root='/data/MOT16/train', det_root=None, seqs=('MOT16-05',), 
         print(seq)
         pprint(part_idx)
         pprint(all_idx)
-        visualize(all, part, keys=["MATCH", "FP"], filename=f"output/{seq}.jpg")
+        # visualize(all, part, keys=["MATCH", "FP"], filename=f"output/{seq}.jpg")
 
         # summary.to_csv(os.path.join(result_root, 'summary_{}.csv'.format(exp_name)))
         # evaluate forecast results

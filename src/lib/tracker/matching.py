@@ -98,6 +98,28 @@ def iou_distance(atracks, btracks):
     return cost_matrix
 
 
+def iou_distance_forecast(atracks, btracks):
+    """
+    Compute cost based on IoU
+    :type atracks: list[STrack]
+    :type btracks: list[STrack]
+
+    :rtype cost_matrix np.ndarray
+    """
+
+    if (len(atracks) > 0 and isinstance(atracks[0], np.ndarray)) or (
+        len(btracks) > 0 and isinstance(btracks[0], np.ndarray)
+    ):
+        atlbrs = atracks
+        btlbrs = btracks
+    else:
+        atlbrs = [track.forecasts[track.time_since_update] if track.time_since_update < len(track.forecasts) else track.tlbr for track in atracks]
+        btlbrs = [track.tlbr for track in btracks]
+    _ious = ious(atlbrs, btlbrs)
+    cost_matrix = 1 - _ious
+
+    return cost_matrix
+
 def embedding_distance(tracks, detections, metric="cosine"):
     """
     :param tracks: list[STrack]
@@ -177,10 +199,16 @@ def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.75, max_length=10):
 def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.75, max_length=10):
     forecasts_inds = np.zeros((len(tracks), len(detections)), dtype=np.int)
 
-    if cost_matrix.size == 0:
+    if not(len(tracks) and len(detections)):
         return cost_matrix, forecasts_inds
 
+    if cost_matrix.size == 0:
+        cost_matrix = np.zeros((len(tracks), len(detections)), dtype=np.int)
+        lambda_ = 0
+
     dets = np.array([d.tlbr for d in detections])
+    dets_scores = [d.score for d in detections]
+    print(f"detection scores: {dets_scores}")
     for row, track in enumerate(tracks):
         # d = dists[row]
         if len(track.forecasts) == 0:
