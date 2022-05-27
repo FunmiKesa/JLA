@@ -98,6 +98,41 @@ def iou_distance(atracks, btracks):
     return cost_matrix
 
 
+def iou_distance_with_clip(atracks, btracks, width=None, height=None):
+    """
+    Compute cost based on IoU
+    :type atracks: list[STrack]
+    :type btracks: list[STrack]
+
+    :rtype cost_matrix np.ndarray
+    """
+
+    if (len(atracks) > 0 and isinstance(atracks[0], np.ndarray)) or (
+        len(btracks) > 0 and isinstance(btracks[0], np.ndarray)
+    ):
+        atlbrs = atracks
+        btlbrs = btracks
+    else:
+        atlbrs = [track.tlbr for track in atracks]
+        btlbrs = [track.tlbr for track in btracks]
+
+    if width and height:
+        if len(atlbrs) > 0:
+            atlbrs = np.array(atlbrs)
+            atlbrs[:, [0, 2]] = np.clip(atlbrs[:, [0, 2]], 0, width)
+            atlbrs[:, [1, 3]] = np.clip(atlbrs[:, [1, 3]], 0, height)
+
+        if len(btlbrs) > 0:
+            btlbrs = np.array(btlbrs)
+            btlbrs[:, [0, 2]] = np.clip(btlbrs[:, [0, 2]], 0, width)
+            btlbrs[:, [1, 3]] = np.clip(btlbrs[:, [1, 3]], 0, height)
+
+    _ious = ious(atlbrs, btlbrs)
+    cost_matrix = 1 - _ious
+
+    return cost_matrix
+
+
 def iou_distance_forecast(atracks, btracks):
     """
     Compute cost based on IoU
@@ -113,12 +148,18 @@ def iou_distance_forecast(atracks, btracks):
         atlbrs = atracks
         btlbrs = btracks
     else:
-        atlbrs = [track.forecasts[track.time_since_update] if track.time_since_update < len(track.forecasts) else track.tlbr for track in atracks]
+        atlbrs = [
+            track.forecasts[track.forecast_index]
+            if track.forecast_index < len(track.forecasts)
+            else track.tlbr
+            for track in atracks
+        ]
         btlbrs = [track.tlbr for track in btracks]
     _ious = ious(atlbrs, btlbrs)
     cost_matrix = 1 - _ious
 
     return cost_matrix
+
 
 def embedding_distance(tracks, detections, metric="cosine"):
     """
@@ -170,7 +211,7 @@ def fuse_motion(kf, cost_matrix, tracks, detections, only_position=False, lambda
     return cost_matrix
 
 
-def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.75, max_length=10):
+def fuse_motion22(cost_matrix, tracks, detections, lambda_=0.75, max_length=10):
     forecasts_inds = np.zeros((len(tracks), len(detections)), dtype=np.int)
 
     if cost_matrix.size == 0:
@@ -196,28 +237,34 @@ def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.75, max_length=10):
     return cost_matrix, forecasts_inds
 
 
-def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.75, max_length=10):
+def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.5, max_length=10):
     forecasts_inds = np.zeros((len(tracks), len(detections)), dtype=np.int)
+    dets = np.array([d.tlbr for d in detections])
+    dets_scores = [d.score for d in detections]
+    meta = {
+        "det_thresh": np.mean(dets_scores) - np.std(dets_scores),
+        "forecasts_inds": forecasts_inds,
+        "dets_scores": dets_scores,
+    }
 
-    if not(len(tracks) and len(detections)):
-        return cost_matrix, forecasts_inds
+    if not (len(tracks) and len(detections)):
+        return cost_matrix, meta
 
     if cost_matrix.size == 0:
         cost_matrix = np.zeros((len(tracks), len(detections)), dtype=np.int)
         lambda_ = 0
 
-    dets = np.array([d.tlbr for d in detections])
-    dets_scores = [d.score for d in detections]
-    print(f"detection scores: {dets_scores}")
     for row, track in enumerate(tracks):
         # d = dists[row]
-        if len(track.forecasts) == 0:
+        if len(track.forecasts) <= track.forecast_index:
             # use last known location
             loc = [track.tlbr]
             print("Use cost_matrix only ", track)
             continue
         else:
-            loc = track.forecasts[:1].copy()
+            loc = track.forecasts[
+                track.forecast_index : track.forecast_index + 1
+            ].copy()
             # loc = track.forecasts[track.forecast_index:track.forecast_index+1].copy()
             # lambda_ = 1 - (0.3 * (track.forecasts_score)) - 0.2
 
@@ -235,8 +282,8 @@ def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.75, max_length=10):
         cost_matrix[row, d >= 1] *= 2
         cost_matrix[row] = lambda_ * cost_matrix[row] + (1 - lambda_) * d
         print("cost_matrix 2: ", cost_matrix[row])
-
-    return cost_matrix, forecasts_inds
+    meta["forecasts_inds"] = forecasts_inds
+    return cost_matrix, meta
 
 
 def fuse_motion2_(cost_matrix, tracks, detections, lambda_=0.75, max_length=20):
@@ -275,12 +322,12 @@ def normalized_euclidean_distance(atracks, btracks):
         # convert to xywh
         axywhs = atracks.copy()
         bxywhs = btracks.copy()
-        
+
         axywhs[:, 2:] -= axywhs[:, :2]
-        axywhs[:, :2] += (axywhs[:, 2:] / 2)
+        axywhs[:, :2] += axywhs[:, 2:] / 2
 
         bxywhs[:, 2:] -= bxywhs[:, :2]
-        bxywhs[:, :2] += (bxywhs[:, 2:] / 2)
+        bxywhs[:, :2] += bxywhs[:, 2:] / 2
 
     else:
         axywhs = np.array([track.xywh for track in atracks])
@@ -295,12 +342,12 @@ def normalized_euclidean_distance(atracks, btracks):
         bxywh = bxywhs[:, :2]
 
         dist = 0.5 * (
-            (axywh - bxywh).var(axis=1)
-            / (axywh.var() + bxywh.var(axis=1) + 1e-8)
+            (axywh - bxywh).var(axis=1) / (axywh.var() + bxywh.var(axis=1) + 1e-8)
         )
-        dists[i] = dist ** 0.5
+        dists[i] = dist**0.5
 
     return dists
+
 
 def centre_distance(atracks, btracks):
     if (len(atracks) > 0 and isinstance(atracks[0], np.ndarray)) or (
@@ -309,12 +356,12 @@ def centre_distance(atracks, btracks):
         # convert to xywh
         axywhs = atracks.copy()
         bxywhs = btracks.copy()
-        
+
         axywhs[:, 2:] -= axywhs[:, :2]
-        axywhs[:, :2] += (axywhs[:, 2:] / 2)
+        axywhs[:, :2] += axywhs[:, 2:] / 2
 
         bxywhs[:, 2:] -= bxywhs[:, :2]
-        bxywhs[:, :2] += (bxywhs[:, 2:] / 2)
+        bxywhs[:, :2] += bxywhs[:, 2:] / 2
     else:
         axywhs = np.array([track.xywh for track in atracks])
         bxywhs = np.array([track.xywh for track in btracks])
@@ -331,6 +378,7 @@ def centre_distance(atracks, btracks):
 
     return dists
 
+
 def size_distance(atracks, btracks):
     if (len(atracks) > 0 and isinstance(atracks[0], np.ndarray)) or (
         len(btracks) > 0 and isinstance(btracks[0], np.ndarray)
@@ -338,12 +386,12 @@ def size_distance(atracks, btracks):
         # convert to xywh
         axywhs = atracks.copy()
         bxywhs = btracks.copy()
-        
+
         axywhs[:, 2:] -= axywhs[:, :2]
-        axywhs[:, :2] += (axywhs[:, 2:] / 2)
+        axywhs[:, :2] += axywhs[:, 2:] / 2
 
         bxywhs[:, 2:] -= bxywhs[:, :2]
-        bxywhs[:, :2] += (bxywhs[:, 2:] / 2)
+        bxywhs[:, :2] += bxywhs[:, 2:] / 2
     else:
         axywhs = np.array([track.xywh for track in atracks])
         bxywhs = np.array([track.xywh for track in btracks])
@@ -354,7 +402,7 @@ def size_distance(atracks, btracks):
         axywh = axywhs[i][2:]
         bxywh = bxywhs[:, 2:]
 
-        dist = np.linalg.norm(axywh - bxywh, axis=1) 
+        dist = np.linalg.norm(axywh - bxywh, axis=1)
 
         dists[i] = dist / max(dist)
 
