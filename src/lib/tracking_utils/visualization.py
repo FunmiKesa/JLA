@@ -51,8 +51,8 @@ def plot_tracking(image, tlwhs, obj_ids, scores=None, frame_id=0, fps=0., ids2=N
         if obj_id not in focus:
             continue
         id_text = '{}'.format(int(obj_id))
-        if ids2 is not None:
-            id_text = id_text + ', {}'.format(int(ids2[i]))
+        # if ids2 is not None:
+        #     id_text = id_text + ', {}'.format(int(ids2[i]))
         if scores is not None:
             id_text = id_text + ' {:.2f}'.format(scores[i])
             # if scores[i] > 0.4:
@@ -72,8 +72,8 @@ def plot_tracking(image, tlwhs, obj_ids, scores=None, frame_id=0, fps=0., ids2=N
         intbox = tuple(map(int, (x1, y1, x1 + w, y1 + h)))
         obj_id = int(gt_ids[i])
         id_text = '{}'.format(int(obj_id))
-        if ids2 is not None:
-            id_text = id_text + ', {}'.format(int(ids2[i]))
+        # if ids2 is not None:
+            # id_text = id_text + ', {}'.format(int(ids2[i]))
         _line_thickness = 1 if obj_id <= 0 else line_thickness
         color = (0, 255, 0)# get_color(abs(obj_id))
         cv2.rectangle(im, intbox[0:2], intbox[2:4], color=color, thickness=line_thickness)
@@ -83,20 +83,19 @@ def plot_tracking(image, tlwhs, obj_ids, scores=None, frame_id=0, fps=0., ids2=N
         cv2.putText(im, id_text, (cx, cy), cv2.FONT_HERSHEY_PLAIN, text_scale, (0, 255, 0),
                     thickness=text_thickness)
         alt_y = not alt_y
-        
-        
     
     for i, tlwhs in enumerate(forecasts):
         obj_id = tlwhs[0]
         # if obj_id not in focus:
             # continue
-        if obj_id not in focus:
-            continue
+        
         tlwhs = tlwhs[1:].reshape(-1, 4)
+        if  not len(tlwhs):
+            continue
         cx, cy, w, h = tlwhs[0]
         
         intbox = tuple(map(int, (cx - w/2, cy - h/2, cx + w/2, cy + h/2)))
-        color = (255, 255,255) #get_color(abs(obj_id))
+        color = (255, 255,255) if ids2 is None or ids2[i] else (0, 0, 255)#get_color(abs(obj_id))
         # cv2.rectangle(im, intbox[0:2], intbox[2:4], color=color, thickness=line_thickness)
         drawrect(im,intbox[0:2], intbox[2:4],color,line_thickness)
 

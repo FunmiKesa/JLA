@@ -203,4 +203,6 @@ def load_txt(filepath, column_length, max_column=400):
         print(filepath, '\n')
         print(ex)
 
-    
+def print_message(message, *args, tag=None):
+    tag = "" if not tag else f"tagid: {tag} "
+    print(f"{tag}{message}{args}")

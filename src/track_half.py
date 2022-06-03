@@ -11,6 +11,7 @@ import argparse
 import motmetrics as mm
 import numpy as np
 import torch
+from tracker.basetrack import TrackState
 
 from tracker.multitracker import JDETracker
 from tracking_utils import visualization as vis
@@ -110,20 +111,24 @@ def eval_seq(
         online_ids = []
         online_scores = []
         online_forecasts = []
+        states = []
         online_forecasts_str = ""
         frame_id += 1
         for t in online_targets:
             tlwh = t.tlwh
             tid = t.track_id
+            
             vertical = tlwh[2] / tlwh[3] > 1.6
             if tlwh[2] * tlwh[3] > opt.min_box_area and not vertical:
+                states.append(t.state == TrackState.Tracked or t.state == TrackState.Occluded)
                 online_tlwhs.append(tlwh)
                 online_ids.append(tid)
                 online_scores.append(t.score)
-                if t.tracklet_len > 0 and len(t.forecasts) > t.forecast_index:
-                    forecasts_xywh = t.forecasts_xywh[t.forecast_index :].reshape(-1)
+                forecasts_xywh = []
+                if len(t.forecasts) > t.f_index:
+                    forecasts_xywh = t.forecasts_xywh[t.f_index :].reshape(-1)
                     online_forecasts_str += f"{tid} {'  '.join(list(forecasts_xywh.round(2).astype(str)))}\n"
-                    online_forecasts.append(np.array([tid] + list(forecasts_xywh)))
+                online_forecasts.append(np.array([tid] + list(forecasts_xywh)))
         timer.toc()
 
         try:
@@ -132,6 +137,9 @@ def eval_seq(
         except:
             pass
         # save results
+        states = np.array(states)
+        online_tlwhs = np.array(online_tlwhs)[states] if len(states) else online_tlwhs
+        online_ids = np.array(online_ids)[states] if len(states) else online_ids
         results.append((frame_id, online_tlwhs, online_ids))
         if len(online_forecasts):
             forecast_results.append((frame_id, online_forecasts_str))
@@ -148,7 +156,7 @@ def eval_seq(
                 fps=1.0 / timer.average_time,
                 gt_tlwhs=gt_tlwhs,
                 gt_ids=gt_ids,
-                forecasts=online_forecasts,
+                forecasts=online_forecasts,ids2=states
             )
             online_im = cv2.addWeighted(heatmap, 0.5, online_im, 0.5, 0)
 

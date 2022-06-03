@@ -65,10 +65,22 @@ class STrack(BaseTrack):
         self.use_kf = use_kf
         self.forecasts_kf = []
         self.forecast_iou = deque([], maxlen=5)
-        self.likelihood = score
         self.width = round(tlwh[2], 2)
         self.height = round(tlwh[3], 2)
         self.static = deque([], maxlen=past_length)
+        self.visibility = deque([], maxlen=buffer_size)
+        self.shift = 0
+        self.shifts = deque([], maxlen=buffer_size)
+
+    @property
+    def shifts_avg(self):
+        return np.mean(list(self.shifts)).round(2)
+
+    def update_shift(self, xywh):
+        self.shift = np.linalg.norm(self.xywh[:2]  - xywh[:2])
+        print("Forecast shift: ", np.linalg.norm(self.forecasts_xywh[:, :2]  - xywh[:2], axis=1))
+        print("Forecast shift 2: ", np.linalg.norm(self.forecasts_xywh[:, :2]  - self.xywh[:2], axis=1))
+        self.shifts.append(self.shift)
 
     def update_features(self, feat):
         if feat is None:
@@ -181,16 +193,16 @@ class STrack(BaseTrack):
 
         self.width = round(new_track.tlwh[2],2)
         self.height = round(new_track.tlwh[3], 2)
-
+            
         # self.static = []
         
-        if len(self.forecasts) > self.forecast_index:
+        if len(self.forecasts) > self.f_index:
             iou = matching.ious(
-                [new_track.tlbr], [self.forecasts[self.forecast_index]]
+                [new_track.tlbr], [self.forecasts[self.f_index]]
             )[0, 0]
 
             if self.forecast_iou_avg - iou > 0.1:
-                print(f"Deviation from mean forecast iou: {iou}")
+                print(f"Deviation from mean forecast iou: {iou}, {round(np.linalg.norm(self.xywh[:2]  - new_track.xywh[:2]), 2)}")
             self.forecast_iou.append(iou)
 
         if self.use_kf:
@@ -225,6 +237,7 @@ class STrack(BaseTrack):
         """
         # self.pasts.append([self.frame_id, self.track_id] + list(self.tlbr))
         self.tracklet_len += 1
+        new_tlwh = new_track.tlwh
 
         if self.tracklet_len > 0:
             static_ratio = sum(self.static) / self.tracklet_len
@@ -232,26 +245,27 @@ class STrack(BaseTrack):
                 # print("Did not change position")
                 # new_tlwh = self._tlwh
 
-            if len(self.forecasts) > self.forecast_index:
+            if len(self.forecasts) > self.f_index:
                 iou = matching.ious(
-                    [new_track.tlbr], [self.forecasts[self.forecast_index]]
+                    [new_track.tlbr], [self.forecasts[self.f_index]]
                 )[0, 0]
 
                 if (self.forecast_iou_avg - iou) > 0.1:
-                    print(f"Deviation from mean forecast iou: {iou}, {static_ratio}")
-            #         if self.forecast_index == 0:
-            #             f = self.forecasts[self.forecast_index].copy()
-            #             # self.forecast_iou.append(matching.ious([self.tlbr], [f])[0, 0])
-
-            #             f[2:] -= f[:2]
-            #             f_wh = f[2:]
-            #             lambda_ = self.forecast_iou_avg * self.forecasts_score
-            #             print(f"lambda_: {lambda_}")
-            #             # lambda_ = 0.5
-            #             # new_tlwh[2:] = np.maximum(new_tlwh[2:], f_wh)
-            #             # new_tlwh[2:] = (1-lambda_) * new_tlwh[2:] + lambda_ * f_wh
-            #             print(f"Update {self} o: {new_track.tlwh} n: {new_tlwh}, f: {f}")
+                    print(f"Deviation from mean forecast iou: {iou}, {static_ratio}, {round(np.linalg.norm(self.xywh[:2]  - new_track.xywh[:2]), 2)}")
+                self.update_shift(new_track.xywh)
                 self.forecast_iou.append(iou)
+
+                    # if self.forecast_index == 0:
+                    #     f = self.forecasts[self.forecast_index].copy()
+                    #     self.forecast_iou.append(matching.ious([self.tlbr], [f])[0, 0])
+
+                    #     f[2:] -= f[:2]
+                    #     f_wh = f[2:]
+                        # lambda_ = self.forecast_iou_avg * self.forecasts_score
+            #             print(f"lambda_: {lambda_}")
+                        # lambda_ = 0.5
+                        # new_tlwh[2:] = (1-lambda_) * new_tlwh[2:] + lambda_ * f_wh
+            #             print(f"Update {self} o: {new_track.tlwh} n: {new_tlwh}, f: {f}")
 
            
 
@@ -262,7 +276,6 @@ class STrack(BaseTrack):
             #     print(f"Update {self} o: {new_track.tlwh} n: {new_tlwh}, f: {f}")
             # else:
             #     print(f"Should not be {self}")
-        new_tlwh = new_track.tlwh
 
         self.width = round(new_tlwh[2],2)
         self.height = round(new_tlwh[3], 2)
@@ -311,6 +324,15 @@ class STrack(BaseTrack):
         self.frame_id = frame_id
         # self.tracklet_len += 1
 
+        if len(self.forecasts) > self.f_index:
+            iou = matching.ious(
+                [new_track.tlbr], [self.forecasts[self.f_index]]
+            )[0, 0]
+            print("update_with_forecast")
+            if (self.forecast_iou_avg - iou) > 0.1:
+                print(f"Deviation from mean forecast iou: {iou}, {round(np.linalg.norm(self.xywh[:2]  - new_track.xywh[:2]), 2)}")
+
+            self.forecast_iou.append(iou)
         new_tlwh = new_track.tlwh
         if self.use_kf:
             self.mean, self.covariance = self.kalman_filter.update(
@@ -319,10 +341,25 @@ class STrack(BaseTrack):
         else:
             self._tlwh = new_tlwh
 
-        self.state = TrackState.Tracked
+        self.state = TrackState.Occluded
         self.is_activated = True
 
         print("Updated with forecast", self)
+
+    def is_static(self):
+        if self.time_since_update >= len(self.visibility):
+            return False
+
+        window = 2
+        min_idx = max(0, self.time_since_update - window)
+        max_idx = min_idx + min(window*2+1, len(self.visibility) - 1)
+        likelihoods = np.array(self.visibility)[min_idx: max_idx]
+        likelihood = self.visibility[self.time_since_update]
+
+        counts = sum(np.isclose(likelihoods, likelihood, atol=1e-4))
+
+        return counts > window
+
 
     @property
     # @jit(nopython=True)
@@ -364,6 +401,21 @@ class STrack(BaseTrack):
         ret = self.tlwh.copy()
         ret[:2] += ret[2:] / 2
         return ret
+
+    @property
+    def f_index(self):
+        # return self.forecast_index if self.is_static() else self.time_since_update
+        return self.time_since_update
+
+    @property
+    def likelihood(self):
+        if not len(self.forecasts):
+            return self.score
+
+        if self.f_index >= len(self.visibility):
+            return 0
+
+        return self.visibility[self.f_index]
 
     @staticmethod
     # @jit(nopython=True)
@@ -409,7 +461,7 @@ class STrack(BaseTrack):
         return 0.0
 
     def __repr__(self):
-        return "OT_{}_({}-{})_({}_{}_{})__{}__{}__{}__{}_({}_{})_{}".format(
+        return "OT_{}_({}-{})_({}_{}_{})__{}__{}__{}__{}_({}_{})_{}_{}_({}_{})".format(
             self.track_id,
             self.start_frame,
             self.end_frame,
@@ -422,7 +474,10 @@ class STrack(BaseTrack):
             self.tracklet_len,
             round(self.width, 2),
             round(self.height, 2),
-            self.static
+            round(self.likelihood, 2),
+            self.is_static(),
+            round(self.shift, 2),
+            self.shifts_avg
         )
 
 
@@ -562,16 +617,18 @@ class JDETracker(object):
             if len(strack_pool) > 0:
                 for t in strack_pool:
                     if not (t.state == TrackState.Tracked):
+                    # if not (t.time_since_update >= 0):
                     # if t.likelihood < 0.1:
-                    #     # t.forecast_index += 1
+                        # if not t.static[-1]:
+                    #     track.forecast_index += 1
+                            # t.forecast_index += 1
                         continue
-                    # if t.track_id == 1 and t.frame_id >= 32:
-                    #     continue;
+
                     bbox = np.zeros((self.past_length, 4), dtype=np.float32)
                     curr_loc = (
-                        t.forecasts[t.forecast_index]
+                        t.forecasts[t.f_index]
                         if t.state != TrackState.Tracked
-                        and len(t.forecasts) > t.forecast_index
+                        and len(t.forecasts) > t.f_index
                         else t.tlbr
                     )
                     print(f"Choosing loc: {t} curr_loc: {curr_loc} tlbr: {t.tlbr}")
@@ -831,7 +888,7 @@ class JDETracker(object):
             del det
 
         # Determine if there is a low prediction, then use forecast height and width
-        on = False
+        on = True
         if on:
             if len(dets_second) > 0:
                 '''Detections'''
@@ -852,13 +909,13 @@ class JDETracker(object):
             r_tracked_stracks = [
                 r_tracked_stracks[i]
                 for i in u_track
-                if r_tracked_stracks[i].state == TrackState.Tracked
+                # if r_tracked_stracks[i].state == TrackState.Tracked
             ]
 
             dists = matching.embedding_distance(r_tracked_stracks, detections_second)
 
             dists, forecasts_inds = matching.fuse_motion2(
-                    dists, r_tracked_stracks, detections_second, max_length=self.past_length, lambda_=0.75
+                    dists, r_tracked_stracks, detections_second, max_length=self.past_length, lambda_=0.5
                 )
 
             matches, u_track, u_detection_ = matching.linear_assignment(dists, thresh=0.4)
@@ -876,13 +933,19 @@ class JDETracker(object):
                     track.forecasts = current_forecasts[track.track_id][0]
                     track.forecasts_score = current_forecasts[track.track_id][1]
 
-                if track.state == TrackState.Tracked:
-                    track.update(det, self.frame_id)
-                    # activated_starcks.append(track)
-                    tracked_stracks.append(track)
-                else:
-                    track.re_activate(det, self.frame_id, new_id=False)
-                    refind_stracks.append(track)
+                # if track.state == TrackState.Tracked:
+                    # track.update(det, self.frame_id)
+                    # # activated_starcks.append(track)
+                    # tracked_stracks.append(track)
+
+                print("Updated with second detection: ", track, det)
+                track.time_since_update += 1
+
+                track.update_with_forecast(det, self.frame_id)
+                forecast_stracks.append(track)
+                # else:
+                #     track.re_activate(det, self.frame_id, new_id=False)
+                #     refind_stracks.append(track)
 
                 del track
                 del det
@@ -962,7 +1025,7 @@ class JDETracker(object):
 
                     self.forecast_hist["ids"][self.frame_id].append(track.track_id)
                     self.forecast_hist["l"][self.frame_id].append(
-                        track.visibility[track.forecast_index]
+                        track.likelihood
                     )
 
                     del track
@@ -985,11 +1048,18 @@ class JDETracker(object):
         print(f"\nmatches: {matches} \nu_unconfirmed: {u_unconfirmed} \nu_detection: {u_detection}")
 
         for itracked, idet in matches:
+            if unconfirmed[itracked].likelihood < self.det_thresh:
+                print("Not confirmed due to low likelihood: ", unconfirmed[itracked], detections[idet])
+                track = unconfirmed[itracked]
+                track.mark_removed()
+                removed_stracks.append(track)
+                continue
+
             print("Confirmed: ", unconfirmed[itracked])
             unconfirmed[itracked].update(detections[idet], self.frame_id)
             # activated_starcks.append(unconfirmed[itracked])
             tracked_stracks.append(unconfirmed[itracked])
-
+            
             del itracked
             del idet
 
@@ -998,8 +1068,6 @@ class JDETracker(object):
             track.mark_removed()
             removed_stracks.append(track)
             print("Not confirmed: ", unconfirmed[it])
-            del it
-            del track
 
         """ Step 4: Init new stracks"""
         det_thresh = max(det_meta["det_thresh"], 0.4)
@@ -1059,7 +1127,7 @@ class JDETracker(object):
             activated_starcks, self.tracked_stracks, width, height
         )
         self.tracked_stracks = joint_stracks(self.tracked_stracks, activated_starcks)
-        self.tracked_stracks = joint_stracks(self.tracked_stracks, forecast_stracks)
+        # self.tracked_stracks = joint_stracks(self.tracked_stracks, forecast_stracks)
         self.tracked_stracks = joint_stracks(self.tracked_stracks, refind_stracks)
         self.lost_stracks = sub_stracks(self.lost_stracks, self.tracked_stracks)
         self.lost_stracks.extend(lost_stracks)
@@ -1068,8 +1136,11 @@ class JDETracker(object):
         self.tracked_stracks, self.lost_stracks = remove_duplicate_stracks(
             self.tracked_stracks, self.lost_stracks
         )
+        self.tracked_stracks = joint_stracks(self.tracked_stracks, forecast_stracks)
+
         # get scores of lost tracks
         output_stracks = [track for track in self.tracked_stracks if track.is_activated]
+
 
         logger.debug("===========Frame {}==========".format(self.frame_id))
         logger.debug(
@@ -1097,31 +1168,35 @@ def update_visibility_map(h, tracks, kernel=1):
     for i, track in enumerate(tracks):
         if len(track.forecasts):
             xy = track.forecasts_xywh[:, :2].round().astype(int)
-            x = (xy[:, 1][:, None] + adj_x[None, :]).flatten().astype(int)
-            y = (xy[:, 0][:, None] + adj_y[None, :]).flatten().astype(int)
-            in_image = (x < h_size[0]) & (y < h_size[1])
+        else:
+            xy = np.array([track.xywh[:2]]).round().astype(int)
+        
+        x = (xy[:, 1][:, None] + adj_x[None, :]).flatten().astype(int)
+        y = (xy[:, 0][:, None] + adj_y[None, :]).flatten().astype(int)
+        in_image = (x < h_size[0]) & (y < h_size[1])
 
-            x, y = np.clip(x, 0, h_size[0] - 1), np.clip(y, 0, h_size[1] - 1)
-            v = h[x, y]
-            # v[~in_image] = 0  # set centres outside the image to 0
-            v = v.reshape(-1, num**2)
+        x, y = np.clip(x, 0, h_size[0] - 1), np.clip(y, 0, h_size[1] - 1)
+        v = h[x, y]
+        # v[~in_image] = 0  # set centres outside the image to 0
+        v = v.reshape(-1, num**2)
 
-            track.visibility = v.max(axis=1)
-            print("\n")
-            print(track)
-            track_lens_avg = np.array(track.tracklet_lens).mean()
-            print("visibility: ", track.visibility)
-            print("visibility_mean: ", v.mean(axis=1))
+        track.visibility.extend(np.round(v.max(axis=1), 4))
+        print("\n")
+        print(track)
+        track_lens_avg = np.array(track.tracklet_lens).mean()
+        print("visibility: ", track.visibility)
+        print("likelihood: ", track.likelihood)
+        print("static: ", track.static)
 
-            visibilities = np.round(track.visibility[:5], 4)
-            track.static.append(int(np.max(visibilities) == np.min(visibilities)))
-            if track.visibility[0] == 0:
-                print(f"Zero likelihood: {track}")
-            
-            # if track.visibility[track.forecast_index] < 0.1:
-            #     print("Low visibility ", in_image, xy)
-            print(f"tracklet_lens: {track.tracklet_lens}")
-            print("track_lens_avg: ", track_lens_avg)
+        track.static.append(int(track.is_static()))
+        if track.visibility[0] == 0:
+            print(f"Zero likelihood: {track}")
+        
+        # if track.visibility[track.forecast_index] < 0.1:
+        #     print("Low visibility ", in_image, xy)
+        print(f"tracklet_lens: {track.tracklet_lens}")
+        print("track_lens_avg: ", track_lens_avg)
+        print("shifts: ", track.shifts)
 
 
 def frame_distance(xywh, img_size):
@@ -1140,27 +1215,30 @@ def frame_distance(xywh, img_size):
     return dist
 
 
-def forecast_track_in_frame1(track, img_size=()):
+def forecast_track_in_frame(track, img_size=()):
     print_message(f"\nForecast: {track}")
     pred = None
 
-    forecast_index = track.forecast_index
-    track.time_since_update  += 1
+    forecast_index = track.f_index
+    track.time_since_update += 1
 
-    if len(track.forecasts) > forecast_index:
-        likelihood = (
-            track.visibility2[track.forecast_index]
-            if len(track.visibility) > track.forecast_index
-            else 0
-        )
-        track.likelihood = likelihood
+    if len(track.forecasts) > forecast_index and track.time_since_update < 30:
+        # likelihood = (
+        #     track.visibility[forecast_index]
+        #     if len(track.visibility) > forecast_index
+        #     else 0
+        # )
+        likelihood = track.likelihood
+        # track.likelihood = likelihood
         track_lens_avg = np.array(track.tracklet_lens).mean()
         print("visibility: ", track.visibility)
         print(f"tracklet_lens: {track.tracklet_lens}")
         print("track_lens_avg: ", track_lens_avg)
 
+        # if not track.static[-1]:
+        #     track.forecast_index += 1
 
-        if track_lens_avg > 3 and likelihood > 0.1:
+        if likelihood > 0.0:
             xywh = track.forecasts_xywh[forecast_index]
             tlwh = xywh.copy()
             tlwh[:2] -= tlwh[2:] / 2
@@ -1178,7 +1256,7 @@ def forecast_track_in_frame1(track, img_size=()):
             )
     return pred
 
-def forecast_track_in_frame(track, img_size=()):
+def forecast_track_in_frame2(track, img_size=()):
     print_message(f"\nForecast: {track}")
     pred = None
 
@@ -1202,7 +1280,7 @@ def forecast_track_in_frame(track, img_size=()):
         print(f"tracklet_lens: {track.tracklet_lens}")
 
         if likelihood > 0.0:
-            if track.forecasts_score > 0.2:
+            if track.forecasts_score > 0.0:
                 if (track.tracklet_len + len(track.pasts)) >= (track.past_length + 5):
                     tlbr = futures[forecast_index]
                     if np.nan not in tlbr:

@@ -237,7 +237,7 @@ def fuse_motion22(cost_matrix, tracks, detections, lambda_=0.75, max_length=10):
     return cost_matrix, forecasts_inds
 
 
-def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.5, max_length=10):
+def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.75, max_length=10):
     forecasts_inds = np.zeros((len(tracks), len(detections)), dtype=np.int)
     dets = np.array([d.tlbr for d in detections])
     dets_scores = [d.score for d in detections]
@@ -274,14 +274,21 @@ def fuse_motion2(cost_matrix, tracks, detections, lambda_=0.5, max_length=10):
         # centre_d = centre_distance(loc, dets)
         print("\n", track)
         print("cost_matrix 1: ", cost_matrix[row])
+        # print("cost_matrix 1: ", cost_matrix[row] * (1 - track.likelihood))
+
         print("iou distance: ", d)
+        # print("iou distance: ", d * (1 - track.likelihood))
         # print("size distance: ", size_d)
         # print("norm distance: ", norm_d)
         # print("centre distance: ", centre_d)
+        # d[d < 0.6] *= (1 - track.likelihood)
 
         cost_matrix[row, d >= 1] *= 2
         cost_matrix[row] = lambda_ * cost_matrix[row] + (1 - lambda_) * d
         print("cost_matrix 2: ", cost_matrix[row])
+        # c = cost_matrix[row].copy()
+        # print("cost_matrix 2: ", c)
+
     meta["forecasts_inds"] = forecasts_inds
     return cost_matrix, meta
 
