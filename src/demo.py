@@ -8,7 +8,7 @@ import logging
 import os
 import os.path as osp
 from opts import opts
-from tracking_utils.utils import mkdir_if_missing
+from tracking_utils.utils import mkdirs
 from tracking_utils.log import logger
 import datasets.dataset.jde as datasets
 from track import eval_seq
@@ -19,7 +19,7 @@ logger.setLevel(logging.INFO)
 
 def demo(opt):
     result_root = opt.output_root if opt.output_root != '' else '.'
-    mkdir_if_missing(result_root)
+    mkdirs(result_root)
 
     logger.info('Starting tracking...')
     dataloader = datasets.LoadVideo(opt.input_video, opt.img_size)
