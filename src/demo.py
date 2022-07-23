@@ -20,6 +20,8 @@ logger.setLevel(logging.INFO)
 def demo(opt):
     result_root = opt.output_root if opt.output_root != '' else '.'
     mkdirs(result_root)
+    forecast_dir = os.path.join('./pred') if opt.forecast else None
+    opt.forecast_dir = forecast_dir
 
     logger.info('Starting tracking...')
     dataloader = datasets.LoadVideo(opt.input_video, opt.img_size)

@@ -72,7 +72,7 @@ class STrack(BaseTrack):
         self.mean, self.covariance = self.kalman_filter.predict(
             mean_state, self.covariance
         )
-        print(self.mean, self.forecasts_xywh)
+        # print(self.mean, self.forecasts_xywh)
 
     @staticmethod
     def multi_predict(stracks):
@@ -779,14 +779,14 @@ def forecast_track_in_frame(track, img_size=()):
         f = (1 - f_dist) * (1 - tsu)
 
     if f < 0.15:
-        print("Low score", track, f, forecast_index)
+        # print("Low score", track, f, forecast_index)
         return pred
 
     pred = STrack(
         tlwh, track.score, track.smooth_feat, 30, past_length=track.past_length
     )
     track.forecast_index += 1
-    print(f"Updated {track}")
+    # print(f"Updated {track}")
 
     return pred
 
