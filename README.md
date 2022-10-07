@@ -45,7 +45,7 @@ python gen_future_bboxes.py
 
 * To train on half Mot17 datasets and evaluate the performance, run:
 ```
-sh experiments/mot17_half_ft_ch.sh
+sh experiments/mot17_half_ft_ch_jla.sh
 ```
 * To train on mix datasets (crowdhuman pre-trained model) and evaluate the performance, run:
 ```
