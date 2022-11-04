@@ -28,7 +28,7 @@ class AverageMeter(object):
 
 def xyxy2xywh(x):
     # Convert bounding box format from [x1, y1, x2, y2] to [x, y, w, h]
-    y = torch.zeros(x.shape) if x.dtype is torch.float32 else np.zeros(x.shape)
+    y = x.copy()
     y[..., 0] = (x[..., 0] + x[..., 2]) / 2
     y[..., 1] = (x[..., 1] + x[..., 3]) / 2
     y[..., 2] = x[..., 2] - x[..., 0]
@@ -38,7 +38,7 @@ def xyxy2xywh(x):
 
 def xywh2xyxy(x):
     # Convert bounding box format from [x, y, w, h] to [x1, y1, x2, y2]
-    y = torch.zeros(x.shape) if x.dtype is torch.float32 else np.zeros(x.shape)
+    y = x.copy()
     y[..., 0] = (x[..., 0] - x[..., 2] / 2)
     y[..., 1] = (x[..., 1] - x[..., 3] / 2)
     y[..., 2] = (x[..., 0] + x[..., 2] / 2)

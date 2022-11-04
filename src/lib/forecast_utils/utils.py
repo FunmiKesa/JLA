@@ -1,5 +1,7 @@
 import numpy as np
 
+from utils.utils import xywh2xyxy
+
 
 def calc_fde(outputs, targets, return_mean=True):
     '''
@@ -11,22 +13,15 @@ def calc_fde(outputs, targets, return_mean=True):
     Returns:
         float: Final displacement error between outputs and targets
     '''
-    # out_mid_xs = outputs[:, -1, 0]
-    # out_mid_ys = outputs[:, -1, 1]
-
-    # tar_mid_xs = targets[:, -1, 0]
-    # tar_mid_ys = targets[:, -1, 1]
-    # diff = ((out_mid_xs - tar_mid_xs) * (out_mid_xs - tar_mid_xs)) + \
-    #     ((out_mid_ys - tar_mid_ys) * (out_mid_ys - tar_mid_ys))
-
     outputs = outputs[:, -1, :2]
     targets = targets[:, -1, :2]
 
     diff = (outputs - targets) * (outputs - targets)
+    fde = np.sqrt(np.sum(diff, axis=1))
     if return_mean:
-        return float(np.mean(np.sqrt(np.mean(diff, axis=1))))
+        return float(np.mean(fde))
     else:
-        return np.sqrt(np.mean(diff, axis=1))
+        return fde
 
 
 def calc_ade(outputs, targets, return_mean=True):
@@ -39,19 +34,13 @@ def calc_ade(outputs, targets, return_mean=True):
     Returns:
         float: Average IOU between outputs and targets
     '''
-    out_mid_xs = outputs[..., 0]
-    out_mid_ys = outputs[..., 1]
+    outputs = outputs[:, :, :2]
+    targets = targets[:, :, :2]
 
-    tar_mid_xs = targets[..., 0]
-    tar_mid_ys = targets[..., 1]
+    diff = (outputs - targets) * (outputs - targets)
+    ade = np.sqrt(np.mean(np.sum(diff, axis=2), axis=1))
 
-    diff = ((out_mid_xs - tar_mid_xs) * (out_mid_xs - tar_mid_xs)) + \
-        ((out_mid_ys - tar_mid_ys) * (out_mid_ys - tar_mid_ys))
-
-    if return_mean:
-        return np.mean(np.sqrt(np.mean(diff, axis=1)))
-    else:
-        return np.sqrt(np.mean(diff, axis=1))
+    return np.mean(ade) if return_mean else ade
 
 
 def calc_fiou(outputs, targets, return_mean=True):
@@ -88,7 +77,7 @@ def calc_aiou(outputs, targets, return_mean=True):
         ious[:, t] = t_iou
 
     if return_mean:
-        return float(np.mean(np.mean(ious, axis=1)))
+        return float(np.mean(ious))
     else:
         return np.mean(ious, axis=1)
 
@@ -129,13 +118,3 @@ def get_iou(bboxes1, bboxes2):
         iou = size_intersection / size_union
         ious.append(iou)
     return ious
-
-
-def xywh2xyxy(x):
-    # Convert bounding box format from [x, y, w, h] to [x1, y1, x2, y2]
-    y = np.zeros(x.shape)
-    y[..., 0] = (x[..., 0] - x[..., 2] / 2)
-    y[..., 1] = (x[..., 1] - x[..., 3] / 2)
-    y[..., 2] = (x[..., 0] + x[..., 2] / 2)
-    y[..., 3] = (x[..., 1] + x[..., 3] / 2)
-    return y
