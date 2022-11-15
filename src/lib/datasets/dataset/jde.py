@@ -759,11 +759,11 @@ class JointDataset(LoadImagesAndLabels):  # for training
                 # 1. set the processed data
                 futures_data_mask &= f_data_mask
                 futures_data[f_data_mask] = f_data
-                futures_data[~futures_data_mask] = 0
+                futures_data[~(futures_data_mask.astype(bool))] = 0
 
                 pasts_data_mask &= p_data_mask
                 pasts_data[p_data_mask] = p_data
-                pasts_data[~pasts_data_mask] = 0
+                pasts_data[~(pasts_data_mask.astype(bool))] = 0
 
                 futures_data = futures_data.reshape(-1, self.future_length, 6)
                 futures_data_mask = futures_data_mask.reshape(-1, self.future_length)
